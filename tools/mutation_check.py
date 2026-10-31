@@ -25,9 +25,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TARGETS = ["negotiator/validator.py", "negotiator/constraints.py", "negotiator/engine.py", "negotiator/fallback.py",
-                   "negotiator/summary.py"]
+                   "negotiator/summary.py", "negotiator/options.py", "negotiator/parsing.py", "negotiator/session.py"]
 FAST_TESTS = ["tests/test_validator.py", "tests/test_validator_verification.py", "tests/test_engine.py",
-              "tests/test_fallback_log.py", "tests/test_schemas_config.py", "tests/test_summary.py"]
+              "tests/test_fallback_log.py", "tests/test_schemas_config.py", "tests/test_summary.py",
+              "tests/test_session.py", "tests/test_parsing.py"]
 
 OPS = {">=": ">", "<=": "<", ">": ">=", "<": "<=", "==": "!=", "!=": "==", "+": "-", "-": "+", "*": "+"}
 NAMES = {"and": "or", "or": "and", "True": "False", "False": "True", "max": "min", "min": "max", "any": "all", "all": "any"}

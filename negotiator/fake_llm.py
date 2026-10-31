@@ -84,14 +84,40 @@ def _atc(view: dict) -> dict[str, Any]:
             p["hold_minutes"], p["delay_min"] = min(p["hold_minutes"], 5), 0
         if "turbulence_at_holding_area" in names:
             p["holding_area"] = calmest
+            if min(a["index"] for a in areas) > m.get("max_turbulence_index", 1.0):
+                p["hold_minutes"] = 0  # no holding area is calm enough: do not hold at all
         if not names:  # rejected with no usable counter: back off
             p["hold_minutes"] = p["hold_minutes"] // 2
         why = "Revised after objections/validator feedback: " + (", ".join(sorted(names)) or "halved the hold") + "."
+    rules = view.get("hard_constraints") or []
+    if rules:
+        _satisfy(p, rules, runways, areas, gates)
+        why += " Respecting the controller's rules."
     if p["hold_minutes"] == 0:
         p["holding_area"] = None
     elif p["holding_area"] is None:
         p["holding_area"] = calmest
     return _msg(Role.ATC, view, "PROPOSE", proposal=p, why=why)
+
+
+def _holds(x, op: str, v) -> bool:
+    return {"==": lambda: x == v, "!=": lambda: x != v, "in": lambda: x in v, "not_in": lambda: x not in v,
+            "<=": lambda: x <= v, ">=": lambda: x >= v}[op]()
+
+
+def _satisfy(p: dict, rules: list[dict], runways: list[dict], areas: list[dict], gates: list[str]) -> None:
+    """Bend the proposal to meet the controller's rules where it can. The validator still has the last word."""
+    pools = {"gate": list(gates), "runway": [r["runway"] for r in sorted(runways, key=lambda r: r["standing_water_mm"])],
+             "holding_area": [a["area"] for a in sorted(areas, key=lambda a: a["index"])]}
+    for r in rules:
+        f, op, v = r["field"], r["op"], r["value"]
+        if f in pools:
+            if p[f] is None or not _holds(p[f], op, v):
+                pick = next((x for x in pools[f] if _holds(x, op, v)), None)
+                if pick is not None:
+                    p[f] = pick
+        elif not _holds(p[f], op, v):
+            p[f] = v if op in ("<=", ">=", "==") else v + 1
 
 
 # --- PILOT ----------------------------------------------------------------

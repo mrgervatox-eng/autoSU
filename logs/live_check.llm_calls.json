@@ -1,0 +1,32 @@
+[
+  {
+    "role": "ATC",
+    "attempt": 0,
+    "model": "claude-opus-5-5",
+    "input_tokens": 2228,
+    "output_tokens": 186,
+    "stop_reason": "end_turn",
+    "request_id": "req_011CgZuRqNXS2YBDAuQaqAhQ",
+    "raw": "{\"type\":\"PROPOSE\",\"proposal\":{\"delay_min\":116,\"hold_minutes\":15,\"separation_sec\":120,\"holding_area\":\"NORTH\",\"gate\":\"A1\",\"runway\":\"27L\"},\"proposal_id\":null,\"rationale\":\"Absorb most of the 131-minute delay on the ground at PSP and take a short 15-minute hold in the calmer NORTH area (index 0.27). This uses the driest runway, 27L at 1.9 mm, available gate A1, and the minimum 120 s separation.\",\"confidence\":0.8}"
+  },
+  {
+    "role": "GROUND",
+    "attempt": 0,
+    "model": "claude-opus-5-5",
+    "input_tokens": 2061,
+    "output_tokens": 97,
+    "stop_reason": "end_turn",
+    "request_id": "req_011CgZuS4fEtFg6XQw8k82N7",
+    "raw": "{\"type\":\"ACCEPT\",\"proposal\":null,\"proposal_id\":\"65d09282\",\"rationale\":\"Runway 27L reads 1.9 mm standing water at 0.9 confidence, well under the 3.0 mm limit. Gate A1 is available.\",\"confidence\":0.9}"
+  },
+  {
+    "role": "PILOT",
+    "attempt": 0,
+    "model": "claude-opus-5-5",
+    "input_tokens": 2323,
+    "output_tokens": 268,
+    "stop_reason": "end_turn",
+    "request_id": "req_011CgZuSJ48jukrz6oY4M9f9",
+    "raw": "{\"type\":\"ACCEPT\",\"proposal\":null,\"proposal_id\":\"65d09282\",\"rationale\":\"Fuel after the 15-minute hold is 7327 kg, which is 712 kg above the 6615 kg trip-plus-reserve requirement. Crew duty comes to 682 of 780 minutes, and NORTH turbulence is 0.27 at 0.9 confidence, well under the 0.6 limit.\",\"confidence\":0.93}"
+  }
+]

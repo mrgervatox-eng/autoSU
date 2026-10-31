@@ -90,6 +90,15 @@ class HardConstraint(Strict):
     def label(self) -> str:
         return f"hard:{self.field}{self.op}{self.value}"
 
+    def describe(self) -> str:
+        """Plain words for the controller: 'gate ≠ A1', 'air hold ≤ 10 min'."""
+        name = {"delay_min": "ground delay", "hold_minutes": "air hold", "separation_sec": "separation", "holding_area": "hold area",
+                "gate": "gate", "runway": "runway"}[self.field]
+        unit = {"delay_min": " min", "hold_minutes": " min", "separation_sec": " s"}.get(self.field, "")
+        sign = {"<=": "≤", ">=": "≥", "==": "=", "!=": "≠", "in": "is one of", "not_in": "is none of"}[self.op]
+        value = ", ".join(self.value) if isinstance(self.value, list) else self.value
+        return f"{name} {sign} {value}{unit if not isinstance(self.value, list) else ''}"
+
     def check(self, proposal: Proposal) -> ConstraintCheck:
         actual = getattr(proposal, self.field)
         if self.op in ("<=", ">="):
@@ -107,8 +116,8 @@ class HardConstraint(Strict):
             name=self.label,
             passed=ok,
             actual=None if actual is None else actual,
-            limit=str(self.value),
-            detail=self.source_text,
+            limit=self.describe(),
+            detail=f'the controller said: "{self.source_text}"' if self.source_text else "",
         )
 
 

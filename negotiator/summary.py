@@ -12,9 +12,11 @@ from typing import Any, Iterable, Sequence
 from .log import ConsensusLog, LogEntry
 from .schemas import ConstraintCheck, MessageType, Proposal
 
-ROLE_LABEL = {"ATC": "ATC", "PILOT": "Pilot", "GROUND": "Ground", "SYSTEM": "System"}
+ROLE_LABEL = {"ATC": "ATC", "PILOT": "Pilot", "GROUND": "Ground", "SYSTEM": "System", "CONTROLLER": "Controller"}
 EVENT_LABEL = {"PROPOSAL": "Propose", "VALIDATOR_VETO": "Validator veto", "INVALID_OUTPUT": "Invalid output",
-               "AGENT_ERROR": "Agent error", "CONSENSUS": "Consensus", "FALLBACK": "Fallback", "ESCALATE": "Escalate"}
+               "AGENT_ERROR": "Agent error", "CONSENSUS": "Consensus", "FALLBACK": "Fallback", "ESCALATE": "Escalate",
+               "OPTIONS": "Options for the controller", "DECISION": "Controller decision", "CONSTRAINTS": "Controller rules",
+               "RENEGOTIATE": "Renegotiate", "FINAL": "Final decision"}
 QUOTE_LIMIT = 160
 MORE_AFTER = 2  # failed checks named in a sentence before "and N more"
 RESPONDERS = ("GROUND", "PILOT")
@@ -123,6 +125,8 @@ def entry_view(e: LogEntry) -> dict[str, Any]:
         "label": label,
         "chips": proposal_chips(m.proposal) if m and m.proposal else [],
         "checks": check_lines(m.constraint_check) if m and m.constraint_check else [],
+        "options": [{"rank": o["rank"], "title": o["title"], "chips": o["chips"], "reason": o["reason"]}
+                    for o in (e.data or {}).get("options", [])] if e.event == "OPTIONS" else [],
     }
 
 
@@ -135,6 +139,7 @@ class RoundSummary:
     kind: str   # consensus | validator_rejected | no_consensus | no_proposal
     short: str  # chip text, e.g. "no consensus (Pilot countered)"
     text: str   # the full sentence
+    attempt: int = 1  # 1 = the first negotiation; 2 and up follow a controller rejection
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -154,26 +159,33 @@ def _limited(items: list[str]) -> str:
     return "; ".join(shown) + (f"; and {extra} more" if extra else "")
 
 
-def round_summary(entries: Sequence[LogEntry], r: int) -> RoundSummary:
-    es = [e for e in entries if e.round == r]
-    head = f"Round {r} ended:"
+def round_label(r: int, attempt: int = 1) -> str:
+    return f"Round {r}" if attempt == 1 else f"Renegotiation {attempt - 1}, round {r}"
+
+
+def round_summary(entries: Sequence[LogEntry], r: int, attempt: int = 1) -> RoundSummary:
+    es = [e for e in entries if e.round == r and e.attempt == attempt]
+    head = f"{round_label(r, attempt)} ended:"
+
+    def make(kind: str, short: str, text: str) -> RoundSummary:
+        return RoundSummary(r, kind, short, text, attempt)
 
     prop = next((e for e in es if e.event == "PROPOSAL"), None)
     if any(e.event == "CONSENSUS" for e in es):
-        return RoundSummary(r, "consensus", "consensus",
-                            f"{head} consensus. ATC proposed {describe_proposal(prop.message.proposal)}; Ground and Pilot accepted; the validator confirmed it.")
+        return make("consensus", "consensus",
+                    f"{head} consensus. ATC proposed {describe_proposal(prop.message.proposal)}; Ground and Pilot accepted; the validator confirmed it.")
 
     if prop is None:
         bad = next((e for e in es if e.actor == "ATC" and e.event in ("INVALID_OUTPUT", "AGENT_ERROR")), None)
         what = ("ATC sent invalid output" if bad.event == "INVALID_OUTPUT" else "ATC's call failed") if bad else "ATC gave no answer"
-        return RoundSummary(r, "no_proposal", "no usable ATC proposal",
-                            f"{head} no consensus. {what}" + (f" ({_first_reason(bad)})" if bad else "") + ", so nothing was proposed.")
+        return make("no_proposal", "no usable ATC proposal",
+                    f"{head} no consensus. {what}" + (f" ({_first_reason(bad)})" if bad else "") + ", so nothing was proposed.")
 
     desc = describe_proposal(prop.message.proposal)
     if prop.ok is False:
         fails = _failures(prop) or [quote(x) for x in prop.reasons]
-        return RoundSummary(r, "validator_rejected", "validator rejected the proposal",
-                            f"{head} the validator rejected ATC's proposal ({desc}). {_limited(fails)}.")
+        return make("validator_rejected", "validator rejected the proposal",
+                    f"{head} the validator rejected ATC's proposal ({desc}). {_limited(fails)}.")
 
     parts: list[str] = []
     objectors: list[str] = []
@@ -214,36 +226,39 @@ def round_summary(entries: Sequence[LogEntry], r: int) -> RoundSummary:
     if final is not None:
         parts.append(f"both accepted, but the validator's final check failed ({', '.join(final.reasons) or 'no detail'})")
     short = "no consensus (" + (", ".join(objectors) if objectors else "final validator check failed") + ")"
-    return RoundSummary(r, "no_consensus", short, f"{head} no consensus. ATC proposed {desc}. " + "; ".join(parts) + ".")
+    return make("no_consensus", short, f"{head} no consensus. ATC proposed {desc}. " + "; ".join(parts) + ".")
 
 
 def all_round_summaries(entries: Sequence[LogEntry]) -> list[RoundSummary]:
-    return [round_summary(entries, r) for r in sorted({e.round for e in entries})]
+    return [round_summary(entries, r, a) for a, r in sorted({(e.attempt, e.round) for e in entries})]
 
 
 class RoundTracker:
     """Decides when a round has ended while entries arrive one at a time (used by the dashboard and the terminal).
 
-    A round ends when an entry from a later round arrives, or when the fallback / escalation entry arrives,
-    or when the run finishes. Each round is announced once.
+    A round ends when an entry from a later round or a later attempt arrives, when the fallback, escalation or the
+    options for the controller arrive, or when the run finishes. Each round is announced once.
     """
 
-    def __init__(self) -> None:
-        self._last: int | None = None
-        self._done: set[int] = set()
+    ENDS_THE_ROUND = ("FALLBACK", "ESCALATE", "OPTIONS")
 
-    def _emit(self, entries: Sequence[LogEntry], r: int) -> list[RoundSummary]:
-        if r in self._done:
+    def __init__(self) -> None:
+        self._last: tuple[int, int] | None = None  # (attempt, round)
+        self._done: set[tuple[int, int]] = set()
+
+    def _emit(self, entries: Sequence[LogEntry], key: tuple[int, int]) -> list[RoundSummary]:
+        if key in self._done:
             return []
-        self._done.add(r)
-        return [round_summary(entries, r)]
+        self._done.add(key)
+        return [round_summary(entries, key[1], key[0])]
 
     def before(self, entries: Sequence[LogEntry], entry: LogEntry) -> list[RoundSummary]:
         """Summaries to show before `entry` (which must already be the last item of `entries`)."""
         out: list[RoundSummary] = []
-        if self._last is not None and (entry.round != self._last or entry.event in ("FALLBACK", "ESCALATE")):
+        key = (entry.attempt, entry.round)
+        if self._last is not None and (key != self._last or entry.event in self.ENDS_THE_ROUND):
             out = self._emit(entries, self._last)
-        self._last = entry.round
+        self._last = key
         return out
 
     def finish(self, entries: Sequence[LogEntry]) -> list[RoundSummary]:

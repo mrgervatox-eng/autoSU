@@ -1,0 +1,294 @@
+[
+  {
+    "seq": 1,
+    "round": 1,
+    "event": "PROPOSAL",
+    "actor": "ATC",
+    "message": {
+      "sender": "ATC",
+      "round": 1,
+      "type": "PROPOSE",
+      "proposal": {
+        "delay_min": 111,
+        "hold_minutes": 20,
+        "separation_sec": 120,
+        "holding_area": "NORTH",
+        "gate": "A1",
+        "runway": "27L"
+      },
+      "proposal_id": null,
+      "constraint_check": [
+        {
+          "name": "min_separation_sec",
+          "passed": true,
+          "actual": 120,
+          "limit": 120,
+          "detail": ""
+        },
+        {
+          "name": "max_hold_min",
+          "passed": true,
+          "actual": 20,
+          "limit": 30,
+          "detail": ""
+        },
+        {
+          "name": "fuel_reserve_kg",
+          "passed": true,
+          "actual": 7127.0,
+          "limit": 6615.0,
+          "detail": "fuel after hold must cover trip fuel + reserve"
+        },
+        {
+          "name": "crew_duty_min",
+          "passed": true,
+          "actual": 682,
+          "limit": 780,
+          "detail": ""
+        },
+        {
+          "name": "gate_available",
+          "passed": true,
+          "actual": "A1",
+          "limit": "A1,A3,A5,B6",
+          "detail": ""
+        },
+        {
+          "name": "assignment_complete",
+          "passed": true,
+          "actual": "gate and runway assigned",
+          "limit": "gate and runway required",
+          "detail": ""
+        },
+        {
+          "name": "turbulence_at_holding_area",
+          "passed": true,
+          "actual": 0.27,
+          "limit": 0.6,
+          "detail": ""
+        },
+        {
+          "name": "runway_standing_water",
+          "passed": false,
+          "actual": 1.9,
+          "limit": 3.0,
+          "detail": "low-confidence observation, needs human confirm"
+        }
+      ],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.75,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "Absorb most of the 131 min delay on the ground at PSP and hold 20 min in the calmer NORTH area, well under the 30 min limit. Runway 27L has the least reported standing water, though that reading is low-confidence and unconfirmed. Gate A1 is available and separation is at the 120 s minimum.",
+      "ts": "2026-10-31T07:19:27.365553Z"
+    },
+    "ok": false,
+    "vetoed": false,
+    "reasons": [
+      "runway_standing_water: actual=1.9 limit=3.0 low-confidence observation, needs human confirm"
+    ],
+    "note": "",
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "hash": "97c5d7a488d463199df0793c848300163768f0417492fce2518024e4597a38b0"
+  },
+  {
+    "seq": 2,
+    "round": 2,
+    "event": "PROPOSAL",
+    "actor": "ATC",
+    "message": {
+      "sender": "ATC",
+      "round": 2,
+      "type": "PROPOSE",
+      "proposal": {
+        "delay_min": 111,
+        "hold_minutes": 20,
+        "separation_sec": 120,
+        "holding_area": "NORTH",
+        "gate": "A1",
+        "runway": "09R"
+      },
+      "proposal_id": null,
+      "constraint_check": [
+        {
+          "name": "min_separation_sec",
+          "passed": true,
+          "actual": 120,
+          "limit": 120,
+          "detail": ""
+        },
+        {
+          "name": "max_hold_min",
+          "passed": true,
+          "actual": 20,
+          "limit": 30,
+          "detail": ""
+        },
+        {
+          "name": "fuel_reserve_kg",
+          "passed": true,
+          "actual": 7127.0,
+          "limit": 6615.0,
+          "detail": "fuel after hold must cover trip fuel + reserve"
+        },
+        {
+          "name": "crew_duty_min",
+          "passed": true,
+          "actual": 682,
+          "limit": 780,
+          "detail": ""
+        },
+        {
+          "name": "gate_available",
+          "passed": true,
+          "actual": "A1",
+          "limit": "A1,A3,A5,B6",
+          "detail": ""
+        },
+        {
+          "name": "assignment_complete",
+          "passed": true,
+          "actual": "gate and runway assigned",
+          "limit": "gate and runway required",
+          "detail": ""
+        },
+        {
+          "name": "turbulence_at_holding_area",
+          "passed": true,
+          "actual": 0.27,
+          "limit": 0.6,
+          "detail": ""
+        },
+        {
+          "name": "runway_standing_water",
+          "passed": false,
+          "actual": 6.8,
+          "limit": 3.0,
+          "detail": ""
+        }
+      ],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.5,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "The validator flagged 27L because its 1.9 mm water reading has low confidence and is not human-confirmed, so this proposal moves to 09R, whose reading has high confidence. The 20-minute hold stays in calm NORTH, within the 30-minute limit, with minimum separation and available gate A1.",
+      "ts": "2026-10-31T07:19:30.734918Z"
+    },
+    "ok": false,
+    "vetoed": false,
+    "reasons": [
+      "runway_standing_water: actual=6.8 limit=3.0"
+    ],
+    "note": "",
+    "prev_hash": "97c5d7a488d463199df0793c848300163768f0417492fce2518024e4597a38b0",
+    "hash": "764cd67fc646e4ad98646cf37b3773a8351d8d768c002cef4eb2cb1702a22872"
+  },
+  {
+    "seq": 3,
+    "round": 3,
+    "event": "PROPOSAL",
+    "actor": "ATC",
+    "message": {
+      "sender": "ATC",
+      "round": 3,
+      "type": "PROPOSE",
+      "proposal": {
+        "delay_min": 111,
+        "hold_minutes": 20,
+        "separation_sec": 120,
+        "holding_area": "NORTH",
+        "gate": "A1",
+        "runway": "27L"
+      },
+      "proposal_id": null,
+      "constraint_check": [
+        {
+          "name": "min_separation_sec",
+          "passed": true,
+          "actual": 120,
+          "limit": 120,
+          "detail": ""
+        },
+        {
+          "name": "max_hold_min",
+          "passed": true,
+          "actual": 20,
+          "limit": 30,
+          "detail": ""
+        },
+        {
+          "name": "fuel_reserve_kg",
+          "passed": true,
+          "actual": 7127.0,
+          "limit": 6615.0,
+          "detail": "fuel after hold must cover trip fuel + reserve"
+        },
+        {
+          "name": "crew_duty_min",
+          "passed": true,
+          "actual": 682,
+          "limit": 780,
+          "detail": ""
+        },
+        {
+          "name": "gate_available",
+          "passed": true,
+          "actual": "A1",
+          "limit": "A1,A3,A5,B6",
+          "detail": ""
+        },
+        {
+          "name": "assignment_complete",
+          "passed": true,
+          "actual": "gate and runway assigned",
+          "limit": "gate and runway required",
+          "detail": ""
+        },
+        {
+          "name": "turbulence_at_holding_area",
+          "passed": true,
+          "actual": 0.27,
+          "limit": 0.6,
+          "detail": ""
+        },
+        {
+          "name": "runway_standing_water",
+          "passed": false,
+          "actual": 1.9,
+          "limit": 3.0,
+          "detail": "low-confidence observation, needs human confirm"
+        }
+      ],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.75,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "Switching to runway 27L, whose 1.9 mm standing water is within the 3.0 mm limit, fixes the only violation; the 20 min hold stays in the calm NORTH area. Note that the 27L water reading has low sensor confidence (0.4) and is not human-confirmed.",
+      "ts": "2026-10-31T07:19:33.902517Z"
+    },
+    "ok": false,
+    "vetoed": false,
+    "reasons": [
+      "runway_standing_water: actual=1.9 limit=3.0 low-confidence observation, needs human confirm"
+    ],
+    "note": "",
+    "prev_hash": "764cd67fc646e4ad98646cf37b3773a8351d8d768c002cef4eb2cb1702a22872",
+    "hash": "c704cdc19928d8c188be6a2fed71df45eb85d82e088f66c69d0495e02dc2bd08"
+  },
+  {
+    "seq": 4,
+    "round": 3,
+    "event": "ESCALATE",
+    "actor": "SYSTEM",
+    "message": null,
+    "ok": null,
+    "vetoed": false,
+    "reasons": [],
+    "note": "no safe fallback exists; human decision required",
+    "prev_hash": "c704cdc19928d8c188be6a2fed71df45eb85d82e088f66c69d0495e02dc2bd08",
+    "hash": "e1c1613960273095a59143a249c15262ee1a2658d2aaa36daf60db4da0145325"
+  }
+]

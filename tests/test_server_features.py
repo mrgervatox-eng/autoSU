@@ -152,6 +152,15 @@ def test_page_has_the_requested_wording_and_no_connection_banner():
     assert "innerHTML" not in html
 
 
+def test_page_has_the_controller_panel_and_its_wording():
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    for text in ("Controller decision", "Approve option", "Reject and renegotiate", "Your rules in force", "Human approves", "Agents only",
+                 "No renegotiations left", "Decide within", "/api/decision", "otherwise our conservative default procedure applies",
+                 "Approved by the controller", "No decision in time", "Too many rejections"):
+        assert text in html, text
+    assert "let prompt" not in html  # a variable named prompt would shadow the browser's own prompt()
+
+
 def test_tile_labels_do_not_share_a_class_with_the_legend_swatches():
     """Regression: a label and a 10px swatch both called 'k' made the tile labels wrap one word per line."""
     html = (STATIC / "index.html").read_text(encoding="utf-8")

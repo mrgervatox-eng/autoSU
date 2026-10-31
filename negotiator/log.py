@@ -8,7 +8,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Any, Callable, Literal
 
 from pydantic import Field
 
@@ -24,6 +24,12 @@ Event = Literal[
     "CONSENSUS",
     "FALLBACK",
     "ESCALATE",
+    # human-in-the-loop (Stage 6)
+    "OPTIONS",         # ranked options shown to the controller
+    "DECISION",        # the controller approved, rejected, or the timer ran out
+    "CONSTRAINTS",     # the controller's free text turned into structured rules (or not understood)
+    "RENEGOTIATE",     # a new negotiation starts with the controller's rules added
+    "FINAL",           # what was finally decided, and why
 ]
 GENESIS = "0" * 64
 logger = logging.getLogger(__name__)
@@ -32,24 +38,29 @@ logger = logging.getLogger(__name__)
 class LogEntry(Strict):
     seq: int
     round: int
+    attempt: int = Field(default=1, ge=1, description="1 = the first negotiation; each controller rejection starts the next")
     event: Event
-    actor: str  # a Role value, or "SYSTEM"
+    actor: str  # a Role value, "CONTROLLER", or "SYSTEM"
     message: Message | None = None
     ok: bool | None = None
     vetoed: bool = False
     reasons: list[str] = Field(default_factory=list)
     note: str = ""
+    data: dict[str, Any] | None = Field(default=None, description="structured detail (options, decision, constraints)")
     prev_hash: str
     hash: str = ""
 
     def compute_hash(self) -> str:
-        body = self.model_dump(mode="json", exclude={"hash"})
+        # attempt 1 and empty data are left out, so logs written before Stage 6 keep their original hashes
+        skip = {"hash"} | ({"attempt"} if self.attempt == 1 else set()) | ({"data"} if self.data is None else set())
+        body = self.model_dump(mode="json", exclude=skip)
         return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
 
 
 class ConsensusLog:
     def __init__(self, entries: list[LogEntry] | None = None) -> None:
         self.entries: list[LogEntry] = entries or []
+        self.attempt = 1  # stamped on every new entry; the session raises it for each renegotiation
         self._subscribers: list[Callable[[LogEntry], None]] = []
 
     def subscribe(self, callback: Callable[[LogEntry], None]) -> None:
@@ -57,10 +68,11 @@ class ConsensusLog:
         self._subscribers.append(callback)
 
     def add(self, round: int, event: Event, actor: str = "SYSTEM", message: Message | None = None,
-            ok: bool | None = None, vetoed: bool = False, reasons: list[str] | None = None, note: str = "") -> LogEntry:
+            ok: bool | None = None, vetoed: bool = False, reasons: list[str] | None = None, note: str = "",
+            data: dict[str, Any] | None = None) -> LogEntry:
         entry = LogEntry(
-            seq=len(self.entries) + 1, round=round, event=event, actor=actor, message=message, ok=ok,
-            vetoed=vetoed, reasons=reasons or [], note=note,
+            seq=len(self.entries) + 1, round=round, attempt=self.attempt, event=event, actor=actor, message=message, ok=ok,
+            vetoed=vetoed, reasons=reasons or [], note=note, data=data,
             prev_hash=self.entries[-1].hash if self.entries else GENESIS,
         )
         entry.hash = entry.compute_hash()
@@ -110,7 +122,8 @@ class ConsensusLog:
         verdict = "" if e.ok is None else ("  [ok]" if e.ok else "  [REJECTED by validator]")
         if e.vetoed:
             verdict = "  [VETOED]"
-        lines = [f"#{e.seq:02d} r{e.round} {e.event:<14} {e.actor:<7} {what}{verdict}"]
+        where = f"r{e.round}" if e.attempt == 1 else f"a{e.attempt}r{e.round}"
+        lines = [f"#{e.seq:02d} {where} {e.event:<14} {e.actor:<10} {what}{verdict}"]
         if e.message is not None and e.message.rationale:
             lines.append(f"      why: {e.message.rationale}")
         lines += [f"      - {r}" for r in e.reasons]

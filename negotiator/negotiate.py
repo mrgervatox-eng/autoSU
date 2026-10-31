@@ -5,6 +5,7 @@
   python -m negotiator.negotiate --scenario data/scenario.json
   python -m negotiator.negotiate --persona PILOT=stubborn         # fake mode: force a failure -> fallback
   python -m negotiator.negotiate --live                           # real Claude agents (needs an API key)
+  python -m negotiator.negotiate --controller script --decisions "reject: avoid gate A1 | approve 1"   # the human step
   python -m negotiator.negotiate --log-out logs/run.json
 
 Real agents are used when config llm.fake_mode = false, or with --live.
@@ -20,6 +21,7 @@ from .config import ROOT, load_config
 from .engine import Negotiation
 from .fake_llm import PERSONAS, FakeLLM
 from .scenario import FIXTURE_CSV, build_scenario, load_scenario, render_cascade
+from .session import AutoApprove, ScriptedDecider, Session, parse_script
 from .summary import render_with_rounds
 
 
@@ -34,6 +36,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--live", action="store_true", help="use real Claude agents even if config fake_mode is true")
     ap.add_argument("--persona", action="append", default=[], metavar="ROLE=NAME",
                     help=f"fake mode only: make a mock agent misbehave; NAME in {', '.join(PERSONAS)}")
+    ap.add_argument("--controller", choices=["off", "approve", "script"], default="off",
+                    help="add the human controller step: 'approve' accepts option 1; 'script' plays --decisions")
+    ap.add_argument("--decisions", default="", help="with --controller script, e.g. 'reject: avoid gate A1 | approve 1' (or timeout)")
     ap.add_argument("--log-out", default=None, help="write the consensus log JSON here (live mode also writes <name>.llm_calls.json)")
     args = ap.parse_args(argv)
 
@@ -41,6 +46,11 @@ def main(argv: list[str] | None = None) -> int:
     live = args.live or not cfg.llm.fake_mode
     if live and args.persona:
         print("error: --persona only works in fake mode", file=sys.stderr)
+        return 1
+    try:
+        decider = AutoApprove() if args.controller == "approve" else ScriptedDecider(parse_script(args.decisions)) if args.controller == "script" else None
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
         return 1
 
     try:
@@ -69,13 +79,28 @@ def main(argv: list[str] | None = None) -> int:
     mode = f"LIVE: {cfg.llm.model}" if live else "FAKE MODE"
     print(render_cascade(scenario))
     print(f"\n--- negotiation ({mode}) ---")
-    result = Negotiation(scenario, llm).run()
+    if decider is None:
+        result = Negotiation(scenario, llm).run()
+        outcome = result.outcome.value
+    else:
+        from .parsing import RuleParser
+
+        parser = RuleParser()
+        if live:
+            from .parsing import ClaudeConstraintParser
+
+            parser = ClaudeConstraintParser(llm)
+        result = Session(scenario, llm, parser, decider).run()
+        outcome = result.outcome
     print(render_with_rounds(result.log))
     p = result.proposal
-    print(f"\nRESULT: {result.outcome.value} - {result.reason}")
+    print(f"\nRESULT: {outcome} - {result.reason}")
     if p is not None:
         print(f"  delay={p.delay_min} min, hold={p.hold_minutes} min in {p.holding_area}, separation={p.separation_sec} s, "
               f"gate={p.gate}, runway={p.runway}  (id {p.proposal_id})")
+    if decider is not None:
+        print(f"  controller: {result.negotiations} negotiation(s), {result.rejections} rejection(s); rules: "
+              + ("; ".join(c.describe() for c in result.constraints) or "none"))
     print(f"log entries: {len(result.log.entries)}, hash chain valid: {result.log.verify()}")
 
     if live:

@@ -78,7 +78,7 @@ class ClaudeLLM:
         messages: list[dict[str, Any]] = [{"role": "user", "content": user_message(view)}]
         text = ""
         for attempt in range(1 + min(self.cfg.max_repairs, 2)):
-            text = self._call(role, system, messages, attempt)
+            text = self._call(role.value, reply_schema(role), system, messages, attempt)
             assembled, problem = self._assemble(role, view, text)
             if assembled is not None:
                 return json.dumps(assembled)
@@ -90,7 +90,16 @@ class ClaudeLLM:
 
     # --- one API call ---------------------------------------------------------
 
-    def _call(self, role: Role, system: str, messages: list[dict[str, Any]], attempt: int) -> str:
+    def ask_json(self, label: str, system: str, user: str, schema: dict[str, Any]) -> str:
+        """One structured-output call for something that is not a negotiating role (e.g. the controller's rule parser).
+
+        Same request shape, error handling, usage tracking and 'disable after a bad key' behaviour as the agents; no repair loop.
+        """
+        if self.disabled_reason:
+            raise LLMError(f"client disabled after earlier failure: {self.disabled_reason}")
+        return self._call(label, schema, system, [{"role": "user", "content": user}], 0)
+
+    def _call(self, label: str, schema: dict[str, Any], system: str, messages: list[dict[str, Any]], attempt: int) -> str:
         kwargs: dict[str, Any] = dict(
             model=self.cfg.model,
             max_tokens=self.cfg.max_tokens,
@@ -98,7 +107,7 @@ class ClaudeLLM:
             messages=messages,
             output_config={
                 "effort": self.cfg.effort,
-                "format": {"type": "json_schema", "schema": reply_schema(role)},
+                "format": {"type": "json_schema", "schema": schema},
             },
         )
         try:
@@ -115,7 +124,7 @@ class ClaudeLLM:
         text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
         usage = getattr(resp, "usage", None)
         self.calls.append(CallRecord(
-            role=role.value, attempt=attempt, model=getattr(resp, "model", self.cfg.model),
+            role=label, attempt=attempt, model=getattr(resp, "model", self.cfg.model),
             input_tokens=getattr(usage, "input_tokens", 0) or 0, output_tokens=getattr(usage, "output_tokens", 0) or 0,
             stop_reason=resp.stop_reason, request_id=getattr(resp, "_request_id", None), raw=text[:RAW_KEEP],
         ))

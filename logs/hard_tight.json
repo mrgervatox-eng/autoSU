@@ -1,0 +1,590 @@
+[
+  {
+    "seq": 1,
+    "round": 1,
+    "event": "PROPOSAL",
+    "actor": "ATC",
+    "message": {
+      "sender": "ATC",
+      "round": 1,
+      "type": "PROPOSE",
+      "proposal": {
+        "delay_min": 111,
+        "hold_minutes": 20,
+        "separation_sec": 120,
+        "holding_area": "NORTH",
+        "gate": "B6",
+        "runway": "27L"
+      },
+      "proposal_id": null,
+      "constraint_check": [
+        {
+          "name": "min_separation_sec",
+          "passed": true,
+          "actual": 120,
+          "limit": 120,
+          "detail": ""
+        },
+        {
+          "name": "max_hold_min",
+          "passed": true,
+          "actual": 20,
+          "limit": 30,
+          "detail": ""
+        },
+        {
+          "name": "fuel_reserve_kg",
+          "passed": false,
+          "actual": 6215.0,
+          "limit": 6615.0,
+          "detail": "fuel after hold must cover trip fuel + reserve"
+        },
+        {
+          "name": "crew_duty_min",
+          "passed": true,
+          "actual": 761,
+          "limit": 780,
+          "detail": ""
+        },
+        {
+          "name": "gate_available",
+          "passed": true,
+          "actual": "B6",
+          "limit": "B6",
+          "detail": ""
+        },
+        {
+          "name": "assignment_complete",
+          "passed": true,
+          "actual": "gate and runway assigned",
+          "limit": "gate and runway required",
+          "detail": ""
+        },
+        {
+          "name": "turbulence_at_holding_area",
+          "passed": true,
+          "actual": 0.55,
+          "limit": 0.6,
+          "detail": ""
+        },
+        {
+          "name": "runway_standing_water",
+          "passed": true,
+          "actual": 2.8,
+          "limit": 3.0,
+          "detail": ""
+        }
+      ],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.75,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "Absorb most of the 131 min delay on the ground at PSP and keep a 20 min hold in NORTH, the calmer area, within the 30 min limit. Land on the drier runway 27L at minimum separation and use B6, the only available gate.",
+      "ts": "2026-10-31T07:19:00.729716Z"
+    },
+    "ok": false,
+    "vetoed": false,
+    "reasons": [
+      "fuel_reserve_kg: actual=6215.0 limit=6615.0 fuel after hold must cover trip fuel + reserve"
+    ],
+    "note": "",
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "hash": "025c6be3ea603e034aee29772d1ef0e4330d0ed10ddda76f4caa4ac16d5a6bfb"
+  },
+  {
+    "seq": 2,
+    "round": 2,
+    "event": "PROPOSAL",
+    "actor": "ATC",
+    "message": {
+      "sender": "ATC",
+      "round": 2,
+      "type": "PROPOSE",
+      "proposal": {
+        "delay_min": 131,
+        "hold_minutes": 0,
+        "separation_sec": 120,
+        "holding_area": null,
+        "gate": "B6",
+        "runway": "27L"
+      },
+      "proposal_id": null,
+      "constraint_check": [
+        {
+          "name": "min_separation_sec",
+          "passed": true,
+          "actual": 120,
+          "limit": 120,
+          "detail": ""
+        },
+        {
+          "name": "max_hold_min",
+          "passed": true,
+          "actual": 0,
+          "limit": 30,
+          "detail": ""
+        },
+        {
+          "name": "fuel_reserve_kg",
+          "passed": true,
+          "actual": 7015.0,
+          "limit": 6615.0,
+          "detail": "fuel after hold must cover trip fuel + reserve"
+        },
+        {
+          "name": "crew_duty_min",
+          "passed": true,
+          "actual": 761,
+          "limit": 780,
+          "detail": ""
+        },
+        {
+          "name": "gate_available",
+          "passed": true,
+          "actual": "B6",
+          "limit": "B6",
+          "detail": ""
+        },
+        {
+          "name": "assignment_complete",
+          "passed": true,
+          "actual": "gate and runway assigned",
+          "limit": "gate and runway required",
+          "detail": ""
+        },
+        {
+          "name": "turbulence_at_holding_area",
+          "passed": true,
+          "actual": null,
+          "limit": 0.6,
+          "detail": "no hold requested"
+        },
+        {
+          "name": "runway_standing_water",
+          "passed": true,
+          "actual": 2.8,
+          "limit": 3.0,
+          "detail": ""
+        }
+      ],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.85,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "Our 20-minute hold left fuel 400 kg below the trip-plus-reserve requirement, so the full 131-minute delay is now taken on the ground at PSP with no airborne hold. This keeps the driest runway (27L), the only available gate (B6) and the minimum separation of 120 seconds.",
+      "ts": "2026-10-31T07:19:05.332384Z"
+    },
+    "ok": true,
+    "vetoed": false,
+    "reasons": [],
+    "note": "",
+    "prev_hash": "025c6be3ea603e034aee29772d1ef0e4330d0ed10ddda76f4caa4ac16d5a6bfb",
+    "hash": "48c197de38dc153adad79ff04bf705971de82acdff4070220dff263851923fd9"
+  },
+  {
+    "seq": 3,
+    "round": 2,
+    "event": "RESPONSE",
+    "actor": "GROUND",
+    "message": {
+      "sender": "GROUND",
+      "round": 2,
+      "type": "REJECT",
+      "proposal": null,
+      "proposal_id": "c4c92bef",
+      "constraint_check": [],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.7,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "Runway 27L reads 2.8 mm standing water, only 0.2 mm under the 3.0 mm limit and not human-confirmed, so it is not well under the margin. The only alternative, 09R at 6.8 mm, exceeds the limit, so no runway counter can fix this.",
+      "ts": "2026-10-31T07:19:09.743683Z"
+    },
+    "ok": true,
+    "vetoed": false,
+    "reasons": [],
+    "note": "",
+    "prev_hash": "48c197de38dc153adad79ff04bf705971de82acdff4070220dff263851923fd9",
+    "hash": "42d3f3bc64cfccd461dc9ead23655e08772f6daedf0bcbfa2f99d55a3a51dd16"
+  },
+  {
+    "seq": 4,
+    "round": 2,
+    "event": "RESPONSE",
+    "actor": "PILOT",
+    "message": {
+      "sender": "PILOT",
+      "round": 2,
+      "type": "ACCEPT",
+      "proposal": null,
+      "proposal_id": "c4c92bef",
+      "constraint_check": [
+        {
+          "name": "min_separation_sec",
+          "passed": true,
+          "actual": 120,
+          "limit": 120,
+          "detail": ""
+        },
+        {
+          "name": "max_hold_min",
+          "passed": true,
+          "actual": 0,
+          "limit": 30,
+          "detail": ""
+        },
+        {
+          "name": "fuel_reserve_kg",
+          "passed": true,
+          "actual": 7015.0,
+          "limit": 6615.0,
+          "detail": "fuel after hold must cover trip fuel + reserve"
+        },
+        {
+          "name": "crew_duty_min",
+          "passed": true,
+          "actual": 761,
+          "limit": 780,
+          "detail": ""
+        },
+        {
+          "name": "gate_available",
+          "passed": true,
+          "actual": "B6",
+          "limit": "B6",
+          "detail": ""
+        },
+        {
+          "name": "assignment_complete",
+          "passed": true,
+          "actual": "gate and runway assigned",
+          "limit": "gate and runway required",
+          "detail": ""
+        },
+        {
+          "name": "turbulence_at_holding_area",
+          "passed": true,
+          "actual": null,
+          "limit": 0.6,
+          "detail": "no hold requested"
+        },
+        {
+          "name": "runway_standing_water",
+          "passed": true,
+          "actual": 2.8,
+          "limit": 3.0,
+          "detail": ""
+        }
+      ],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.9,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "With no hold, fuel stays at 7015 kg against the 6615 kg trip-plus-reserve minimum, a 400 kg buffer. Crew duty comes to 761 of 780 minutes, so no turbulent holding area is needed.",
+      "ts": "2026-10-31T07:19:13.133145Z"
+    },
+    "ok": true,
+    "vetoed": false,
+    "reasons": [],
+    "note": "",
+    "prev_hash": "42d3f3bc64cfccd461dc9ead23655e08772f6daedf0bcbfa2f99d55a3a51dd16",
+    "hash": "07e50a1994caecf7ea37d288f0dabf280af0164869f499a04ef000630a0680a3"
+  },
+  {
+    "seq": 5,
+    "round": 3,
+    "event": "PROPOSAL",
+    "actor": "ATC",
+    "message": {
+      "sender": "ATC",
+      "round": 3,
+      "type": "PROPOSE",
+      "proposal": {
+        "delay_min": 131,
+        "hold_minutes": 0,
+        "separation_sec": 150,
+        "holding_area": null,
+        "gate": "B6",
+        "runway": "27L"
+      },
+      "proposal_id": null,
+      "constraint_check": [
+        {
+          "name": "min_separation_sec",
+          "passed": true,
+          "actual": 150,
+          "limit": 120,
+          "detail": ""
+        },
+        {
+          "name": "max_hold_min",
+          "passed": true,
+          "actual": 0,
+          "limit": 30,
+          "detail": ""
+        },
+        {
+          "name": "fuel_reserve_kg",
+          "passed": true,
+          "actual": 7015.0,
+          "limit": 6615.0,
+          "detail": "fuel after hold must cover trip fuel + reserve"
+        },
+        {
+          "name": "crew_duty_min",
+          "passed": true,
+          "actual": 761,
+          "limit": 780,
+          "detail": ""
+        },
+        {
+          "name": "gate_available",
+          "passed": true,
+          "actual": "B6",
+          "limit": "B6",
+          "detail": ""
+        },
+        {
+          "name": "assignment_complete",
+          "passed": true,
+          "actual": "gate and runway assigned",
+          "limit": "gate and runway required",
+          "detail": ""
+        },
+        {
+          "name": "turbulence_at_holding_area",
+          "passed": true,
+          "actual": null,
+          "limit": 0.6,
+          "detail": "no hold requested"
+        },
+        {
+          "name": "runway_standing_water",
+          "passed": true,
+          "actual": 2.8,
+          "limit": 3.0,
+          "detail": ""
+        }
+      ],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.7,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "27L is the driest runway and is inside the 3.0 mm limit, while 09R exceeds it; to address GROUND's concern I am absorbing the full delay on the ground, adding no airborne hold, and increasing separation to 150 s as an extra buffer, with human confirmation of 27L standing water requested before arrival.",
+      "ts": "2026-10-31T07:19:16.499337Z"
+    },
+    "ok": true,
+    "vetoed": false,
+    "reasons": [],
+    "note": "",
+    "prev_hash": "07e50a1994caecf7ea37d288f0dabf280af0164869f499a04ef000630a0680a3",
+    "hash": "e1254e11ce278d17f0e652abd8388050b03a6a700a1b26e5cf9214aad3b3cd2f"
+  },
+  {
+    "seq": 6,
+    "round": 3,
+    "event": "RESPONSE",
+    "actor": "GROUND",
+    "message": {
+      "sender": "GROUND",
+      "round": 3,
+      "type": "REJECT",
+      "proposal": null,
+      "proposal_id": "7f04676e",
+      "constraint_check": [],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.7,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "Runway 27L reads 2.8 mm of standing water against a 3.0 mm maximum, which is not well under the limit. The only alternative, 09R, reads 6.8 mm and exceeds it, so no runway counter can fix this; gate B6 is fine.",
+      "ts": "2026-10-31T07:19:20.591339Z"
+    },
+    "ok": true,
+    "vetoed": false,
+    "reasons": [],
+    "note": "",
+    "prev_hash": "e1254e11ce278d17f0e652abd8388050b03a6a700a1b26e5cf9214aad3b3cd2f",
+    "hash": "4a72359e8be82a17f3eb3d41fe1f014b111970dfbfea789cedf0f3cc3fe736d0"
+  },
+  {
+    "seq": 7,
+    "round": 3,
+    "event": "RESPONSE",
+    "actor": "PILOT",
+    "message": {
+      "sender": "PILOT",
+      "round": 3,
+      "type": "ACCEPT",
+      "proposal": null,
+      "proposal_id": "7f04676e",
+      "constraint_check": [
+        {
+          "name": "min_separation_sec",
+          "passed": true,
+          "actual": 150,
+          "limit": 120,
+          "detail": ""
+        },
+        {
+          "name": "max_hold_min",
+          "passed": true,
+          "actual": 0,
+          "limit": 30,
+          "detail": ""
+        },
+        {
+          "name": "fuel_reserve_kg",
+          "passed": true,
+          "actual": 7015.0,
+          "limit": 6615.0,
+          "detail": "fuel after hold must cover trip fuel + reserve"
+        },
+        {
+          "name": "crew_duty_min",
+          "passed": true,
+          "actual": 761,
+          "limit": 780,
+          "detail": ""
+        },
+        {
+          "name": "gate_available",
+          "passed": true,
+          "actual": "B6",
+          "limit": "B6",
+          "detail": ""
+        },
+        {
+          "name": "assignment_complete",
+          "passed": true,
+          "actual": "gate and runway assigned",
+          "limit": "gate and runway required",
+          "detail": ""
+        },
+        {
+          "name": "turbulence_at_holding_area",
+          "passed": true,
+          "actual": null,
+          "limit": 0.6,
+          "detail": "no hold requested"
+        },
+        {
+          "name": "runway_standing_water",
+          "passed": true,
+          "actual": 2.8,
+          "limit": 3.0,
+          "detail": ""
+        }
+      ],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.93,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "With no hold, fuel stays at 7015 kg against a 6615 kg trip-plus-reserve requirement, a 400 kg buffer. Crew duty totals 761 of 780 minutes, and no turbulent holding area is used.",
+      "ts": "2026-10-31T07:19:23.963500Z"
+    },
+    "ok": true,
+    "vetoed": false,
+    "reasons": [],
+    "note": "",
+    "prev_hash": "4a72359e8be82a17f3eb3d41fe1f014b111970dfbfea789cedf0f3cc3fe736d0",
+    "hash": "86afe6c7912d839f1d4edf6e2f41ba79244e65474d9742d7189eda6b560c983f"
+  },
+  {
+    "seq": 8,
+    "round": 3,
+    "event": "FALLBACK",
+    "actor": "ATC",
+    "message": {
+      "sender": "ATC",
+      "round": 3,
+      "type": "PROPOSE",
+      "proposal": {
+        "delay_min": 0,
+        "hold_minutes": 2,
+        "separation_sec": 180,
+        "holding_area": "NORTH",
+        "gate": "B6",
+        "runway": "27L"
+      },
+      "proposal_id": null,
+      "constraint_check": [
+        {
+          "name": "min_separation_sec",
+          "passed": true,
+          "actual": 180,
+          "limit": 120,
+          "detail": ""
+        },
+        {
+          "name": "max_hold_min",
+          "passed": true,
+          "actual": 2,
+          "limit": 30,
+          "detail": ""
+        },
+        {
+          "name": "fuel_reserve_kg",
+          "passed": true,
+          "actual": 6935.0,
+          "limit": 6615.0,
+          "detail": "fuel after hold must cover trip fuel + reserve"
+        },
+        {
+          "name": "crew_duty_min",
+          "passed": true,
+          "actual": 632,
+          "limit": 780,
+          "detail": ""
+        },
+        {
+          "name": "gate_available",
+          "passed": true,
+          "actual": "B6",
+          "limit": "B6",
+          "detail": ""
+        },
+        {
+          "name": "assignment_complete",
+          "passed": true,
+          "actual": "gate and runway assigned",
+          "limit": "gate and runway required",
+          "detail": ""
+        },
+        {
+          "name": "turbulence_at_holding_area",
+          "passed": true,
+          "actual": 0.55,
+          "limit": 0.6,
+          "detail": ""
+        },
+        {
+          "name": "runway_standing_water",
+          "passed": true,
+          "actual": 2.8,
+          "limit": 3.0,
+          "detail": ""
+        }
+      ],
+      "provenance": {
+        "source": "fallback",
+        "confidence": 1.0,
+        "note": "our conservative default procedure"
+      },
+      "rationale": "Negotiation did not converge; applying our conservative default procedure.",
+      "ts": "2026-10-31T07:19:23.964216Z"
+    },
+    "ok": true,
+    "vetoed": false,
+    "reasons": [],
+    "note": "no consensus in 3 rounds; our conservative default procedure",
+    "prev_hash": "86afe6c7912d839f1d4edf6e2f41ba79244e65474d9742d7189eda6b560c983f",
+    "hash": "d7f9322a9908d2ede6fee44b0bc1fdeea73ff58ab2f7d311ddcce3ff66a1ffcf"
+  }
+]

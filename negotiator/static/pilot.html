@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pilot phone</title>
+<style>
+  :root { color-scheme: light dark; --ink: #0b0b0b; --bg: #f9f9f7; --card: #fcfcfb; --muted: #52514e; --line: #c3c2b7; --good: #0ca30c; --warn: #b07a00; --crit: #d03b3b; --bar: #2a78d6; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #f0efec; --bg: #0d0d0d; --card: #1a1a19; --muted: #c3c2b7; --line: #383835; --warn: #fab219; --bar: #3987e5; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 16px; max-width: 560px; margin-inline: auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { margin: 6px 0; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 12px 0; }
+  .row { display: flex; gap: 10px; }
+  button { font: inherit; color: var(--ink); background: var(--card); border: 2px solid var(--line); border-radius: 10px; padding: 14px; flex: 1; cursor: pointer; }
+  button.on { border-color: var(--ink); font-weight: 700; }
+  button.go { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 700; width: 100%; }
+  .big { font-size: 44px; font-weight: 700; margin: 0; }
+  .meter { height: 12px; background: var(--line); border-radius: 6px; overflow: hidden; margin: 8px 0; }
+  .meter > span { display: block; height: 100%; width: 0; background: var(--bar); border-radius: 6px; transition: width .2s; }
+  #status { font-weight: 600; }
+  .ico { display: inline-block; width: 18px; font-weight: 700; }
+  .good { color: var(--good); } .warn { color: var(--warn); } .crit { color: var(--crit); }
+</style>
+</head>
+<body>
+<h1>Pilot phone</h1>
+<p class="muted">Lay the phone flat, screen up. Shake or tap it to mimic rough air. The reading goes to the dashboard as the turbulence at the area you pick.</p>
+
+<div class="card">
+  <p><strong>1. Holding area</strong></p>
+  <div class="row" id="areas"><button class="on" data-area="NORTH">NORTH</button><button data-area="SOUTH">SOUTH</button></div>
+</div>
+
+<div class="card">
+  <p><strong>2. Sense</strong></p>
+  <button class="go" id="start">Start sensing</button>
+  <p id="status" role="status"><span class="ico warn">⚠</span>Not started.</p>
+  <p class="big" id="index">–</p>
+  <div class="meter" role="img" aria-label="turbulence proxy"><span id="fill"></span></div>
+  <p class="muted" id="detail">Turbulence proxy 0 to 1</p>
+</div>
+
+<div class="card muted">
+  <p><strong>How the number is made</strong></p>
+  <p>The phone reports acceleration along its vertical axis (z, with gravity removed). We take the root-mean-square (RMS) of the last 3 seconds and divide by <code>FULL_SCALE</code> = 3 m/s², capped at 1:</p>
+  <p><code>index = min(1, RMS ÷ 3)</code>. Still ≈ 0, a firm tap or shake ≈ 1. The dashboard’s limit for a holding area is 0.6 (RMS ≈ 1.8 m/s²).</p>
+  <p>Confidence = (how much of the 3 s window is filled) × (how fast the sensor reports, 20 Hz or more counts as full). Under 0.6 the validator will not trust it.</p>
+  <p>No GPS and no microphone are used. Needs HTTPS (see the tunnel steps) and, on iPhone, the permission prompt after you tap Start.</p>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const WINDOW_MS = 3000;       // rolling window
+const FULL_SCALE = 3.0;       // m/s^2 RMS that maps to a turbulence proxy of 1.0
+const SEND_EVERY_MS = 1000;
+const FULL_RATE_HZ = 20;      // reporting rate that counts as full confidence
+
+let area = 'NORTH', samples = [], gravity = null, started = false, lastEvent = 0, sendTimer = null, watchdog = null;
+
+const clamp01 = (x) => Math.min(1, Math.max(0, x));
+const turbulenceIndex = (rms) => clamp01(rms / FULL_SCALE);
+
+function say(kind, text) {
+  const s = $('status');
+  s.replaceChildren();
+  const i = document.createElement('span');
+  i.className = 'ico ' + kind;
+  i.textContent = { good: '✓', warn: '⚠', crit: '✕' }[kind];
+  s.append(i, document.createTextNode(text));
+}
+
+function onMotion(e) {
+  const now = performance.now();
+  lastEvent = now;
+  let z = null;
+  if (e.acceleration && e.acceleration.z !== null && e.acceleration.z !== undefined) z = e.acceleration.z;   // gravity already removed
+  else if (e.accelerationIncludingGravity && e.accelerationIncludingGravity.z != null) {
+    const g = e.accelerationIncludingGravity.z;
+    gravity = gravity === null ? g : gravity + 0.02 * (g - gravity);   // slow average = gravity; what is left is the shaking
+    z = g - gravity;
+  }
+  if (z === null) return;
+  samples.push([now, z]);
+  while (samples.length && now - samples[0][0] > WINDOW_MS) samples.shift();
+}
+
+function reading() {
+  if (samples.length < 2) return null;
+  const span = samples[samples.length - 1][0] - samples[0][0];
+  if (span < 500) return null;
+  const rms = Math.sqrt(samples.reduce((a, s) => a + s[1] * s[1], 0) / samples.length);
+  const hz = samples.length / (span / 1000);
+  return { rms, hz, index: turbulenceIndex(rms), confidence: Math.round(Math.min(1, span / WINDOW_MS) * Math.min(1, hz / FULL_RATE_HZ) * 100) / 100 };
+}
+
+function show(r) {
+  $('index').textContent = r.index.toFixed(2);
+  $('fill').style.width = (r.index * 100).toFixed(0) + '%';
+  $('detail').textContent = `RMS ${r.rms.toFixed(2)} m/s², ${r.hz.toFixed(0)} Hz, confidence ${r.confidence.toFixed(2)}`;
+}
+
+async function send() {
+  const r = reading();
+  if (!r) return;
+  show(r);
+  try {
+    const res = await fetch('/api/observation/turbulence', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ area, index: Number(r.index.toFixed(3)), confidence: r.confidence }) });
+    if (res.ok) say('good', `Sending to ${area}: ${r.index.toFixed(2)} (confidence ${r.confidence.toFixed(2)})`);
+    else { const j = await res.json().catch(() => ({})); say('crit', typeof j.detail === 'string' ? j.detail : 'The server refused the reading.'); }
+  } catch (err) { say('crit', 'Could not reach the server.'); }
+}
+
+async function start() {
+  if (!window.isSecureContext) return say('crit', 'Motion sensors need HTTPS. Open this page through the tunnel URL (https://…).');
+  if (typeof DeviceMotionEvent === 'undefined') return say('crit', 'This browser has no motion sensor support.');
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {   // iPhone: must be asked from a tap
+    try { if ((await DeviceMotionEvent.requestPermission()) !== 'granted') return say('crit', 'Motion permission was refused. Reload and tap Allow.'); }
+    catch (err) { return say('crit', 'Could not ask for motion permission: ' + err.message); }
+  }
+  if (!started) { window.addEventListener('devicemotion', onMotion); started = true; }
+  samples = []; gravity = null; lastEvent = 0;
+  say('warn', 'Listening for motion…');
+  clearInterval(sendTimer); sendTimer = setInterval(send, SEND_EVERY_MS);
+  clearTimeout(watchdog);
+  watchdog = setTimeout(() => { if (!lastEvent) say('crit', 'No motion data arrived. Use a phone (not a desktop), over HTTPS.'); }, 2500);
+  $('start').textContent = 'Restart sensing';
+}
+
+$('start').addEventListener('click', start);
+for (const b of document.querySelectorAll('#areas button')) b.addEventListener('click', () => { area = b.dataset.area; document.querySelectorAll('#areas button').forEach((x) => x.classList.toggle('on', x === b)); });
+
+// build the area buttons from the server, so they match the scenario
+fetch('/api/state').then((r) => r.json()).then((s) => {
+  if (!s.areas || !s.areas.length) return;
+  $('areas').replaceChildren(...s.areas.map((a, i) => {
+    const b = document.createElement('button');
+    b.textContent = a; b.dataset.area = a; if (i === 0) { b.className = 'on'; area = a; }
+    b.addEventListener('click', () => { area = a; document.querySelectorAll('#areas button').forEach((x) => x.classList.toggle('on', x === b)); });
+    return b;
+  }));
+}).catch(() => {});
+</script>
+</body>
+</html>

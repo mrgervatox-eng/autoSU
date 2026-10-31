@@ -123,7 +123,10 @@ A reading for a different area or runway never counts.
    fallback mutants; the survivors exposed real test gaps (round-limit boundary, REJECT handling, the
    engine's last-moment re-check, the fallback's fuel buffer), and a later run on the summary code found
    more (failures exactly at a limit, wrong-role entries). All now have tests.
-   Current result: **179 of 179 killed**.
+   Stage 6 added the ranked options, the rule parser and the controller session to the checked files; again
+   the survivors showed gaps (hours versus minutes, "more than" versus "at least", the round stamped on
+   controller entries) and redundant code that was then removed, and the fallback's search was tightened.
+   Current result: **286 of 286 killed**.
 
 Limit of this evidence: the oracle and the validator were written by the same team from the same
 specification, so they share any misunderstanding of what the rules *should* be. The tests prove the

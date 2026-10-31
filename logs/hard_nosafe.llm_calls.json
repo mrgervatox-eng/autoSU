@@ -1,0 +1,32 @@
+[
+  {
+    "role": "ATC",
+    "attempt": 0,
+    "model": "claude-opus-5-5",
+    "input_tokens": 2228,
+    "output_tokens": 201,
+    "stop_reason": "end_turn",
+    "request_id": "req_011CgZuf1ik3NBu4QpbxkGLn",
+    "raw": "{\"type\":\"PROPOSE\",\"proposal\":{\"delay_min\":111,\"hold_minutes\":20,\"separation_sec\":120,\"holding_area\":\"NORTH\",\"gate\":\"A1\",\"runway\":\"27L\"},\"proposal_id\":null,\"rationale\":\"Absorb most of the 131 min delay on the ground at PSP and hold 20 min in the calmer NORTH area, well under the 30 min limit. Runway 27L has the least reported standing water, though that reading is low-confidence and unconfirmed. Gate A1 is available and separation is at the 120 s minimum.\",\"confidence\":0.75}"
+  },
+  {
+    "role": "ATC",
+    "attempt": 0,
+    "model": "claude-opus-5-5",
+    "input_tokens": 2367,
+    "output_tokens": 196,
+    "stop_reason": "end_turn",
+    "request_id": "req_011CgZufFpJjJUCmndK4v5Gv",
+    "raw": "{\"type\":\"PROPOSE\",\"proposal\":{\"delay_min\":111,\"hold_minutes\":20,\"separation_sec\":120,\"holding_area\":\"NORTH\",\"gate\":\"A1\",\"runway\":\"09R\"},\"proposal_id\":null,\"rationale\":\"The validator flagged 27L because its 1.9 mm water reading has low confidence and is not human-confirmed, so this proposal moves to 09R, whose reading has high confidence. The 20-minute hold stays in calm NORTH, within the 30-minute limit, with minimum separation and available gate A1.\",\"confidence\":0.5}"
+  },
+  {
+    "role": "ATC",
+    "attempt": 0,
+    "model": "claude-opus-5-5",
+    "input_tokens": 2353,
+    "output_tokens": 192,
+    "stop_reason": "end_turn",
+    "request_id": "req_011CgZufWEELzQS4X7reZkP7",
+    "raw": "{\"type\":\"PROPOSE\",\"proposal\":{\"delay_min\":111,\"hold_minutes\":20,\"separation_sec\":120,\"holding_area\":\"NORTH\",\"gate\":\"A1\",\"runway\":\"27L\"},\"proposal_id\":null,\"rationale\":\"Switching to runway 27L, whose 1.9 mm standing water is within the 3.0 mm limit, fixes the only violation; the 20 min hold stays in the calm NORTH area. Note that the 27L water reading has low sensor confidence (0.4) and is not human-confirmed.\",\"confidence\":0.75}"
+  }
+]

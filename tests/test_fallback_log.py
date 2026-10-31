@@ -1,6 +1,6 @@
 import pytest
 
-from negotiator.constraints import RunwayObservation, TurbulenceObservation
+from negotiator.constraints import HardConstraint, RunwayObservation, TurbulenceObservation
 from negotiator.fallback import FALLBACK_LABEL, build_fallback, fallback_message
 from negotiator.log import ConsensusLog
 from negotiator.scenario import FIXTURE_CSV, build_scenario
@@ -96,6 +96,55 @@ def test_fallback_holding_area_is_allowed_exactly_at_the_limit_but_not_beyond(sc
     assert proposal.holding_area == "NORTH" and proposal.hold_minutes > 0
     ctx.turbulence[0].index = min(1.0, ctx.margins.max_turbulence_index + 0.05)
     assert build_fallback(ctx)[0].hold_minutes == 0
+
+
+def rule(field, op, value):
+    return HardConstraint(field=field, op=op, value=value, source_text="test")
+
+
+def test_fallback_meets_a_numeric_rule_by_searching(scen):
+    scen.context.hard_constraints = [rule("delay_min", ">=", 30)]
+    p, _ = build_fallback(scen.context)
+    assert p.delay_min == 30  # the first value that satisfies the rule, not a guess
+
+
+def test_other_rules_do_not_leak_into_a_fields_candidates(scen):
+    # the separation rule comes first; it must not make 200 a candidate for the ground delay
+    scen.context.hard_constraints = [rule("separation_sec", ">=", 200), rule("delay_min", ">=", 30)]
+    p, _ = build_fallback(scen.context)
+    assert (p.delay_min, p.separation_sec) == (30, 200)
+
+
+def test_not_equal_to_a_preferred_value_moves_to_the_next_number(scen):
+    scen.context.hard_constraints = [rule("delay_min", "!=", 0)]
+    assert build_fallback(scen.context)[0].delay_min == 1
+
+
+def test_a_rule_can_use_the_very_top_of_the_allowed_range(scen):
+    scen.context.hard_constraints = [rule("separation_sec", ">=", 3600)]
+    assert build_fallback(scen.context)[0].separation_sec == 3600
+
+
+def test_fallback_steps_past_gates_runways_and_areas_the_rules_exclude(scen):
+    ctx = scen.context
+    ctx.runways.append(RunwayObservation(runway="18C", standing_water_mm=2.0, provenance=prov(0.9)))  # a second dry runway to move to
+    best = build_fallback(ctx)[0]
+    ctx.hard_constraints = [rule("gate", "!=", best.gate), rule("runway", "!=", best.runway)]
+    p, report = build_fallback(ctx)
+    assert p.gate != best.gate and p.runway != best.runway and report.passed
+    assert p.gate == sorted(g for g in ctx.aircraft.available_gates if g != best.gate)[0]  # the next gate in order
+    if best.holding_area:
+        ctx.hard_constraints = [rule("holding_area", "!=", best.holding_area)]
+        q = build_fallback(ctx)[0]
+        assert q.holding_area != best.holding_area or q.hold_minutes == 0
+
+
+def test_fallback_ranks_by_the_worst_reading(scen):
+    ctx = scen.context
+    ctx.runways = [RunwayObservation(runway="09R", standing_water_mm=0.5, provenance=prov(0.9)),
+                   RunwayObservation(runway="09R", standing_water_mm=2.9, provenance=prov(0.9)),   # worst 2.9
+                   RunwayObservation(runway="27L", standing_water_mm=1.5, provenance=prov(0.9))]   # worst 1.5: drier overall
+    assert build_fallback(ctx)[0].runway == "27L"
 
 
 def test_fallback_message_is_labelled(scen):

@@ -74,7 +74,8 @@ def build_view(role: Role, scenario: Scenario, round_: int, table: Proposal | No
     if role == Role.ATC:
         return base | {
             "disruption": scenario.disruption.description,
-            "margins": {"min_separation_sec": m.min_separation_sec, "max_hold_min": m.max_hold_min},
+            "margins": {"min_separation_sec": m.min_separation_sec, "max_hold_min": m.max_hold_min,
+                        "max_turbulence_index": m.max_turbulence_index},
             "airfield": {"runways": _runways(ctx), "areas": _areas(ctx), "gates": list(ctx.aircraft.available_gates)},
             "own_last_proposal": own_last.model_dump() if own_last else None,
             "counters": counters,
