@@ -55,6 +55,21 @@ def test_tail_override_and_weather_kind():
     assert s.disruption.kind == "WEATHER" and s.disruption.delay_min == 25
 
 
+def test_kind_filter():
+    assert build_scenario(FIXTURE_CSV, 1, 1, kind="weather").seed.flight_number == "201"
+    assert build_scenario(FIXTURE_CSV, 1, 1, kind="late_aircraft").seed.flight_number == "102"
+    assert build_scenario(FIXTURE_CSV, 1, 2, kind="WEATHER").seed.flight_number == "501"
+    with pytest.raises(ValueError, match="kind WEATHER"):
+        build_scenario(FIXTURE_CSV, 1, 1, tail="N111AA", kind="weather")
+    with pytest.raises(ValueError, match="unknown kind"):
+        build_scenario(FIXTURE_CSV, 1, 1, kind="fog")
+
+
+def test_cli_kind_option(tmp_path, capsys):
+    assert main(["--csv", str(FIXTURE_CSV), "--kind", "weather", "--out", str(tmp_path / "w.json")]) == 0
+    assert "Disruption (WEATHER)" in capsys.readouterr().out
+
+
 def test_cancelled_and_tailless_flights_never_seed():
     with pytest.raises(ValueError):
         build_scenario(FIXTURE_CSV, 1, 1, tail="N333CC")  # only a cancelled leg

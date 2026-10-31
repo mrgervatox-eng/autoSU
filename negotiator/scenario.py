@@ -3,7 +3,7 @@
 Real data: the flight legs and their delays.
 SIMULATED (scenario-enrichment layer): fuel, gates, crew hours and sensor readings.
 
-CLI:  python -m negotiator.scenario --month 1 --day 1 [--tail N376AA] [--csv PATH] [--out PATH]
+CLI:  python -m negotiator.scenario --month 1 --day 1 [--kind weather] [--tail N376AA] [--csv PATH] [--out PATH]
 """
 from __future__ import annotations
 
@@ -142,14 +142,22 @@ def read_day(csv_path: str | Path, month: int, day: int) -> list[FlightLeg]:
 # --- seed selection and cascade ------------------------------------------
 
 
+def leg_kind(leg: FlightLeg) -> str | None:
+    """Seed criterion from the brief. Weather wins when both apply.
+
+    Cancelled/diverted legs and legs with no tail can't seed a chain.
+    """
+    if leg.cancelled or leg.diverted or leg.tail_number == "":
+        return None
+    if leg.weather_delay_min > 15:
+        return "WEATHER"
+    if leg.late_aircraft_delay_min > 20:
+        return "LATE_AIRCRAFT"
+    return None
+
+
 def is_disrupted(leg: FlightLeg) -> bool:
-    """Seed criterion from the brief; cancelled/diverted legs and legs with no tail can't seed a chain."""
-    return (
-        (leg.weather_delay_min > 15 or leg.late_aircraft_delay_min > 20)
-        and not leg.cancelled
-        and not leg.diverted
-        and leg.tail_number != ""
-    )
+    return leg_kind(leg) is not None
 
 
 def tail_chain(legs: list[FlightLeg], tail: str) -> list[FlightLeg]:
@@ -160,19 +168,29 @@ def _delayed_after(chain: list[FlightLeg], index: int) -> int:
     return sum(1 for l in chain[index + 1 :] if (l.departure_delay_min or 0) > 0)
 
 
-def pick_seed(legs: list[FlightLeg], tail: str | None = None) -> tuple[list[FlightLeg], int]:
-    """Return (tail chain, seed index). Most delayed legs downstream wins, then biggest delay."""
+def pick_seed(legs: list[FlightLeg], tail: str | None = None, kind: str | None = None) -> tuple[list[FlightLeg], int]:
+    """Return (tail chain, seed index). Most delayed legs downstream wins, then biggest delay.
+
+    `kind` ("WEATHER" or "LATE_AIRCRAFT", case-insensitive) restricts which disruption can seed.
+    """
+    kind = kind.upper() if kind else None
+    if kind not in (None, "WEATHER", "LATE_AIRCRAFT"):
+        raise ValueError(f"unknown kind {kind!r}; use weather or late_aircraft")
     best: tuple[tuple[int, int], list[FlightLeg], int] | None = None
     for t in sorted({l.tail_number for l in legs if l.tail_number and (tail is None or l.tail_number == tail)}):
         chain = tail_chain(legs, t)
         for i, leg in enumerate(chain):
-            if not is_disrupted(leg):
+            k = leg_kind(leg)
+            if k is None or (kind is not None and k != kind):
                 continue
             score = (_delayed_after(chain, i), max(leg.weather_delay_min, leg.late_aircraft_delay_min))
             if best is None or score > best[0]:
                 best = (score, chain, i)
     if best is None:
-        raise ValueError("no flight meets WEATHER_DELAY > 15 or LATE_AIRCRAFT_DELAY > 20" + (f" for tail {tail}" if tail else ""))
+        raise ValueError(
+            "no flight meets WEATHER_DELAY > 15 or LATE_AIRCRAFT_DELAY > 20"
+            + (f" (kind {kind})" if kind else "") + (f" for tail {tail}" if tail else "")
+        )
     return best[1], best[2]
 
 
@@ -243,11 +261,11 @@ def build_context(seed: FlightLeg, kind: str, margins: Margins, limits: Limits) 
 
 
 def build_scenario(csv_path: str | Path, month: int, day: int, margins: Margins | None = None,
-                   limits: Limits | None = None, tail: str | None = None) -> Scenario:
+                   limits: Limits | None = None, tail: str | None = None, kind: str | None = None) -> Scenario:
     legs = read_day(csv_path, month, day)
     if not legs:
         raise ValueError(f"no flights found for month={month} day={day} in {csv_path}")
-    chain, idx = pick_seed(legs, tail)
+    chain, idx = pick_seed(legs, tail, kind)
     seed = chain[idx]
     disruption = describe_disruption(seed)
     return Scenario(
@@ -303,6 +321,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--month", type=int, default=1)
     ap.add_argument("--day", type=int, default=1)
     ap.add_argument("--tail", default=None, help="restrict seed to this TAIL_NUMBER")
+    ap.add_argument("--kind", choices=["weather", "late_aircraft"], default=None,
+                    help="only seed from this disruption type (default: whichever has the longest cascade)")
     ap.add_argument("--csv", default=None, help="flights CSV (default: config data.flights_csv)")
     ap.add_argument("--out", default=None, help="where to write scenario JSON (default: config data.scenario_path)")
     ap.add_argument("--no-save", action="store_true")
@@ -314,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[fake mode] {csv_path} not found, using fixture {FIXTURE_CSV}")
         csv_path = FIXTURE_CSV
     try:
-        scenario = build_scenario(csv_path, args.month, args.day, cfg.margins, cfg.limits, args.tail)
+        scenario = build_scenario(csv_path, args.month, args.day, cfg.margins, cfg.limits, args.tail, args.kind)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
