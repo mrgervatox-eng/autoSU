@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATC disruption negotiator</title>
+<style>
+  /* Tokens: validated reference palette, categorical slots 1-3 for the three roles. Dark = its own steps. */
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,.10);
+    --atc: #2a78d6; --pilot: #eb6834; --ground: #1baf7a; --bar: #2a78d6;
+    --good: #0ca30c; --warn: #fab219; --crit: #d03b3b; --wash: rgba(11,11,11,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,.10);
+      --atc: #3987e5; --pilot: #d95926; --ground: #199e70; --bar: #3987e5; --wash: rgba(255,255,255,.05);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,.10);
+    --atc: #3987e5; --pilot: #d95926; --ground: #199e70; --bar: #3987e5; --wash: rgba(255,255,255,.05);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; }
+  header h1 { font-size: 18px; margin: 0; flex: 1; font-weight: 650; }
+  header small { color: var(--ink2); font-weight: 400; margin-left: 8px; }
+  button, select, input { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; padding: 5px 8px; }
+  button { cursor: pointer; }
+  button:hover { background: var(--wash); }
+  :focus-visible { outline: 2px solid var(--atc); outline-offset: 2px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; color: var(--ink2); background: var(--surface); }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; padding: 0 20px 14px; }
+  .controls label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink2); }
+  .controls input[type=number] { width: 64px; }
+  .controls #run { background: var(--ink); color: var(--surface); border-color: var(--ink); font-weight: 600; padding: 7px 16px; }
+  .controls #run:disabled { opacity: .5; cursor: progress; }
+  #msg { color: var(--ink); align-self: center; }
+  main { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; padding: 0 20px 28px; align-items: start; }
+  @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+  .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 8px; }
+  .card h3 { font-size: 13px; margin: 14px 0 8px; color: var(--ink2); font-weight: 600; }
+  .notice { background: var(--wash); border-radius: 8px; padding: 8px 10px; color: var(--ink2); font-size: 12.5px; }
+  .badge { font-size: 10.5px; letter-spacing: .04em; border: 1px solid var(--axis); border-radius: 4px; padding: 0 5px; color: var(--ink2); text-transform: uppercase; white-space: nowrap; }
+  /* cascade bars: thin, 4px rounded data end, anchored to the baseline */
+  .leg { display: grid; grid-template-columns: 38px 62px 82px minmax(60px, 1fr) 64px; gap: 8px; align-items: center; padding: 5px 4px; border-radius: 6px; }
+  .leg:hover, .leg:focus-visible { background: var(--wash); }
+  .leg .t, .leg .v { font-variant-numeric: tabular-nums; color: var(--ink2); }
+  .leg .v { text-align: right; color: var(--ink); }
+  .leg .r { color: var(--ink2); white-space: nowrap; }
+  .track { height: 10px; border-left: 1px solid var(--axis); position: relative; }
+  .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--bar); border-radius: 0 4px 4px 0; }
+  .leg.seed { background: var(--wash); }
+  .leg .tag { grid-column: 2 / -1; font-size: 12px; color: var(--ink2); margin-top: -2px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .tile { border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+  .tile .k { font-size: 12px; color: var(--ink2); display: flex; justify-content: space-between; gap: 6px; }
+  .tile .big { font-size: 22px; font-weight: 600; margin: 2px 0; }
+  .tile .sub { font-size: 12px; color: var(--ink2); }
+  .meter { height: 6px; background: var(--grid); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  .meter > span { display: block; height: 100%; background: var(--bar); border-radius: 3px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--ink2); font-weight: 500; font-size: 12px; }
+  th, td { padding: 5px 6px; border-bottom: 1px solid var(--grid); }
+  td.num { font-variant-numeric: tabular-nums; }
+  .ico { display: inline-block; width: 16px; text-align: center; font-weight: 700; }
+  .ico.good { color: var(--good); } .ico.warn { color: var(--warn); } .ico.crit { color: var(--crit); }
+  .legend { display: flex; gap: 14px; margin: 4px 0 10px; color: var(--ink2); font-size: 12.5px; flex-wrap: wrap; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .sw.ATC { background: var(--atc); } .sw.PILOT { background: var(--pilot); } .sw.GROUND { background: var(--ground); } .sw.SYSTEM { background: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .chip { border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; font-size: 12.5px; color: var(--ink2); }
+  #logwrap { max-height: 70vh; overflow-y: auto; padding-right: 4px; }  /* the log scrolls inside the card; the page never jumps */
+  ol#log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .entry { border: 1px solid var(--border); border-left-width: 4px; border-radius: 8px; padding: 8px 10px; }
+  .entry.ATC { border-left-color: var(--atc); } .entry.PILOT { border-left-color: var(--pilot); }
+  .entry.GROUND { border-left-color: var(--ground); } .entry.SYSTEM { border-left-color: var(--muted); }
+  .entry .head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .entry .who { font-weight: 650; } .entry .what { color: var(--ink2); }
+  .entry .verdict { margin-left: auto; font-size: 12.5px; }
+  .entry p { margin: 4px 0 0; color: var(--ink2); }
+  .kv { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .kv span { background: var(--wash); border-radius: 4px; padding: 1px 7px; font-size: 12.5px; }
+  select:disabled, input:disabled { opacity: .5; }
+  .entry ul { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; }
+  .entry details { margin-top: 6px; font-size: 12.5px; color: var(--ink2); }
+  .entry.veto { background: var(--wash); }
+  .divider { text-align: center; color: var(--muted); font-size: 12px; border-top: 1px dashed var(--axis); padding-top: 4px; margin-top: 2px; }
+  .result { display: flex; gap: 10px; align-items: flex-start; }
+  .result .big { font-size: 20px; font-weight: 650; }
+  .empty { color: var(--muted); }
+  #tip { position: fixed; z-index: 10; pointer-events: none; background: var(--ink); color: var(--surface); border-radius: 6px; padding: 6px 9px; font-size: 12.5px; max-width: 280px; white-space: pre-line; }
+  @media (forced-colors: active) { .fill, .meter > span { border: 1px solid CanvasText; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>ATC disruption negotiator <small id="scenarioId"></small></h1>
+  <span class="pill" id="conn"><span class="ico warn" aria-hidden="true">⚠</span><span>connecting…</span></span>
+  <button id="theme" type="button" aria-label="Toggle dark mode">Theme</button>
+</header>
+
+<form id="controls" class="controls" aria-label="Run settings">
+  <label>Mode <select id="mode"><option value="fake">Fake (mock agents)</option><option value="live" id="liveOpt">Live (real Claude)</option></select></label>
+  <label>Scenario <select id="source"><option value="file">Saved scenario</option><option value="csv">From flights data</option></select></label>
+  <label>Disruption <select id="kind"><option value="">Longest cascade</option><option value="weather">Weather</option><option value="late_aircraft">Late aircraft</option></select></label>
+  <label>Month <input id="month" type="number" min="1" max="12" value="1"></label>
+  <label>Day <input id="day" type="number" min="1" max="31" value="1"></label>
+  <span id="personas" style="display:contents"></span>
+  <label>Pace <select id="pace"><option value="0">Instant</option><option value="0.7" selected>Step through</option><option value="1.5">Slow</option></select></label>
+  <button id="run" type="submit">Run negotiation</button>
+  <span id="msg" role="alert"></span>
+</form>
+
+<main>
+  <div class="col">
+    <section class="card" aria-labelledby="h-cascade">
+      <h2 id="h-cascade">Disruption and cascade</h2>
+      <p id="disruption" style="margin:0 0 8px"></p>
+      <div class="notice" id="note"></div>
+      <h3 id="chartTitle"></h3>
+      <div id="bars" role="list"></div>
+      <p id="cascadeSummary" style="color:var(--ink2);margin:8px 0 0"></p>
+    </section>
+    <section class="card" aria-labelledby="h-sim">
+      <h2 id="h-sim">Simulated conditions <span class="badge">simulated</span></h2>
+      <div class="tiles" id="tiles"></div>
+      <table id="sensors"><thead><tr><th>Reading</th><th>Value</th><th>Limit</th><th>Status</th></tr></thead><tbody></tbody></table>
+    </section>
+  </div>
+  <div class="col">
+    <section class="card" id="resultCard" hidden aria-live="polite"></section>
+    <section class="card" aria-labelledby="h-neg">
+      <h2 id="h-neg">Negotiation <span class="badge" id="modeBadge">fake</span></h2>
+      <div class="legend" aria-label="Legend: role colours"><span><i class="sw ATC"></i>ATC</span><span><i class="sw PILOT"></i>PILOT</span><span><i class="sw GROUND"></i>GROUND</span></div>
+      <div class="chips" id="rounds"></div>
+      <div id="logwrap"><ol id="log" aria-live="polite"><li class="empty">No run yet. Press “Run negotiation”.</li></ol></div>
+    </section>
+  </div>
+</main>
+<div id="tip" role="tooltip" hidden></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+// Everything dynamic (including LLM-written text) enters the page as text nodes, never as HTML strings.
+function h(tag, props = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'class') el.className = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined && v !== false) el.setAttribute(k, v === true ? '' : String(v));
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+const ico = (kind) => h('span', { class: 'ico ' + kind, 'aria-hidden': 'true' }, { good: '✓', warn: '⚠', crit: '✕' }[kind]);
+const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + String(m % 60).padStart(2, '0');
+const signed = (n) => (n > 0 ? '+' : '') + n;
+
+let state = { allow_live: false, personas: [], roles: [] };
+let entries = [];
+let running = false;
+
+/* ---------- tooltip ---------- */
+const tip = $('tip');
+function bindTip(el, text) {
+  const show = (x, y) => { tip.textContent = text; tip.hidden = false; tip.style.left = Math.min(x + 12, innerWidth - 300) + 'px'; tip.style.top = (y + 14) + 'px'; };
+  el.addEventListener('mousemove', (e) => show(e.clientX, e.clientY));
+  el.addEventListener('mouseleave', () => { tip.hidden = true; });
+  el.addEventListener('focus', () => { const r = el.getBoundingClientRect(); show(r.left + 20, r.bottom - 8); });
+  el.addEventListener('blur', () => { tip.hidden = true; });
+}
+
+/* ---------- scenario panel ---------- */
+function renderScenario(s) {
+  const seed = s.chain[s.seed_index];
+  $('scenarioId').textContent = s.scenario_id;
+  $('disruption').textContent = (s.disruption.kind === 'WEATHER' ? 'Weather' : 'Late-aircraft') + ' disruption: ' + s.disruption.description;
+  $('note').textContent = s.enrichment_note;
+  $('chartTitle').textContent = `Departure delay by leg, tail ${seed.tail_number}, ${seed.date} (minutes)`;
+  const max = Math.max(1, ...s.chain.map((l) => l.departure_delay_min || 0));
+  const bars = $('bars');
+  bars.replaceChildren();
+  s.chain.forEach((l, i) => {
+    const d = l.departure_delay_min;
+    const isSeed = i === s.seed_index;
+    const label = `${l.airline}${l.flight_number}`;
+    const row = h('div', { class: 'leg' + (isSeed ? ' seed' : ''), role: 'listitem', tabindex: 0,
+        'aria-label': `${label} ${l.origin} to ${l.destination}, departure delay ${d === null ? 'unknown' : d + ' minutes'}${isSeed ? ', disrupted leg' : ''}` },
+      h('span', { class: 't' }, hhmm(l.scheduled_departure_min)),
+      h('span', {}, label),
+      h('span', { class: 'r' }, `${l.origin}→${l.destination}`),
+      h('span', { class: 'track' }, h('span', { class: 'fill', style: `width:${Math.max(0, (d || 0) / max * 100).toFixed(1)}%` })),
+      h('span', { class: 'v' }, l.cancelled ? 'cancelled' : d === null ? 'n/a' : `${signed(d)} min`),
+      isSeed ? h('span', { class: 'tag' }, '▶ disrupted leg (seed of this scenario)') : null);
+    bindTip(row, `${label}  ${l.origin}→${l.destination}\nscheduled ${hhmm(l.scheduled_departure_min)}\ndeparture delay ${d === null ? 'n/a' : signed(d)} min\narrival delay ${l.arrival_delay_min === null ? 'n/a' : signed(l.arrival_delay_min)} min\nweather ${l.weather_delay_min} min, late aircraft ${l.late_aircraft_delay_min} min`);
+    bars.append(row);
+  });
+  const c = s.cascade;
+  $('cascadeSummary').textContent = `${c.legs_after_seed} later leg(s) on this tail, ${c.delayed_after_seed} delayed; ${c.total_late_aircraft_delay_after_seed_min} min of late-aircraft delay downstream.`;
+
+  const a = s.context.aircraft, m = s.context.margins;
+  const duty = a.crew_duty_used_min, flight = a.flight_time_remaining_min;
+  const tile = (k, big, sub, frac) => h('div', { class: 'tile' },
+    h('div', { class: 'k' }, h('span', {}, k)),
+    h('div', { class: 'big' }, big), h('div', { class: 'sub' }, sub),
+    frac === undefined ? null : h('div', { class: 'meter', role: 'img', 'aria-label': `${Math.round(frac * 100)}% of limit` }, h('span', { style: `width:${Math.min(100, frac * 100).toFixed(0)}%` })));
+  $('tiles').replaceChildren(
+    tile('Fuel on board', `${Math.round(a.fuel_on_board_kg)} kg`, `trip ${Math.round(a.trip_fuel_kg)} kg + reserve ${Math.round(m.fuel_reserve_kg)} kg`, (a.trip_fuel_kg + m.fuel_reserve_kg) / a.fuel_on_board_kg),
+    tile('Crew duty', `${duty + flight} / ${m.max_duty_min} min`, `${duty} used + ${flight} flight, before any delay`, (duty + flight) / m.max_duty_min),
+    tile('Gates free', a.available_gates.join(', ') || 'none', `${a.available_gates.length} available`));
+
+  const rows = [];
+  const status = (ok, conf) => {
+    if (conf < m.min_observation_confidence) return [ico('warn'), ' low confidence, needs confirm'];
+    return ok ? [ico('good'), ' within limit'] : [ico('crit'), ' over limit'];
+  };
+  s.context.turbulence.forEach((o) => rows.push(h('tr', {}, h('td', {}, `Turbulence ${o.area}`), h('td', { class: 'num' }, o.index.toFixed(2)),
+    h('td', { class: 'num' }, `≤ ${m.max_turbulence_index}`), h('td', {}, ...status(o.index <= m.max_turbulence_index, o.provenance.confidence)))));
+  s.context.runways.forEach((o) => rows.push(h('tr', {}, h('td', {}, `Runway ${o.runway} standing water`), h('td', { class: 'num' }, `${o.standing_water_mm} mm`),
+    h('td', { class: 'num' }, `≤ ${m.max_standing_water_mm} mm`), h('td', {}, ...status(o.standing_water_mm <= m.max_standing_water_mm, o.provenance.confidence)))));
+  $('sensors').tBodies[0].replaceChildren(...rows);
+}
+
+/* ---------- negotiation log ---------- */
+const EVENT_LABEL = { PROPOSAL: 'PROPOSE', RESPONSE: null, VALIDATOR_VETO: 'VALIDATOR VETO', INVALID_OUTPUT: 'INVALID OUTPUT',
+  AGENT_ERROR: 'AGENT ERROR', CONSENSUS: 'CONSENSUS', FALLBACK: 'FALLBACK', ESCALATE: 'ESCALATE' };
+
+function proposalChips(p) {
+  return h('div', { class: 'kv' },
+    h('span', {}, `delay ${p.delay_min} min`), h('span', {}, `hold ${p.hold_minutes} min${p.holding_area ? ' @ ' + p.holding_area : ''}`),
+    h('span', {}, `separation ${p.separation_sec} s`), h('span', {}, `gate ${p.gate ?? '–'}`), h('span', {}, `runway ${p.runway ?? '–'}`));
+}
+
+function entryNode(e) {
+  if (e.event === 'ROUND_END') return h('li', { class: 'divider' }, `Round ${e.round} ended${e.note ? ': ' + e.note : ''}`);
+  const m = e.message;
+  const label = EVENT_LABEL[e.event] ?? (m ? m.type : e.event);
+  let verdict = null;
+  if (e.vetoed) verdict = h('span', { class: 'verdict' }, ico('warn'), ' vetoed by validator');
+  else if (e.ok === true) verdict = h('span', { class: 'verdict' }, ico('good'), ' validator: ok');
+  else if (e.ok === false) verdict = h('span', { class: 'verdict' }, ico('crit'), ' rejected by validator');
+  const checks = m && m.constraint_check && m.constraint_check.length ? m.constraint_check : null;
+  const passed = checks ? checks.filter((c) => c.passed).length : 0;
+  return h('li', { class: `entry ${e.actor}${e.vetoed ? ' veto' : ''}` },
+    h('div', { class: 'head' },
+      h('span', { class: 'what' }, `#${e.seq}`), h('span', { class: 'chip' }, `R${e.round}`),
+      h('span', { class: 'who' }, h('i', { class: `sw ${e.actor}` }), e.actor),
+      h('span', { class: 'what' }, label), verdict),
+    m && m.rationale ? h('p', {}, m.rationale) : null,
+    m && m.proposal ? proposalChips(m.proposal) : null,
+    m && !m.proposal && m.proposal_id ? h('div', { class: 'kv' }, h('span', {}, `proposal ${m.proposal_id}`)) : null,
+    e.reasons.length ? h('ul', {}, e.reasons.map((r) => h('li', {}, r))) : null,
+    e.note ? h('p', {}, e.note) : null,
+    checks ? h('details', {}, h('summary', {}, `Validator checks: ${passed}/${checks.length} passed`),
+      h('ul', {}, checks.map((c) => h('li', {}, ico(c.passed ? 'good' : 'crit'), ` ${c.name}: ${c.actual ?? '–'} (limit ${c.limit ?? '–'})${c.detail ? ', ' + c.detail : ''}`)))) : null,
+    m ? h('div', { class: 'kv' }, h('span', {}, `source: ${m.provenance.source}, confidence ${Number(m.provenance.confidence).toFixed(2)}${m.provenance.note ? ' (' + m.provenance.note + ')' : ''}`)) : null);
+}
+
+function renderRounds() {
+  const byRound = new Map();
+  for (const e of entries) {
+    const r = byRound.get(e.round) || { consensus: false, fallback: false, invalid: false, ended: false };
+    if (e.event === 'CONSENSUS') r.consensus = true;
+    if (e.event === 'FALLBACK' || e.event === 'ESCALATE') r.fallback = true;
+    if (e.event === 'PROPOSAL' && e.ok === false) r.invalid = true;
+    if (e.event === 'ROUND_END') r.ended = true;
+    byRound.set(e.round, r);
+  }
+  const chips = [...byRound].map(([n, r]) => {
+    let kind = 'warn', text = r.ended ? 'no consensus' : 'in progress';
+    if (r.consensus) { kind = 'good'; text = 'consensus'; }
+    else if (r.invalid && r.ended) { kind = 'crit'; text = 'proposal failed validation'; }
+    else if (r.fallback && !r.ended) { kind = 'warn'; text = 'fallback applied'; }
+    return h('span', { class: 'chip' }, ico(kind), ` Round ${n}: ${text}`);
+  });
+  $('rounds').replaceChildren(...chips);
+}
+
+function addEntry(e) {
+  const wrap = $('logwrap');
+  const follow = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 80;  // only follow if the reader is at the bottom
+  if (!entries.length) $('log').replaceChildren();
+  entries.push(e);
+  $('log').append(entryNode(e));
+  renderRounds();
+  if (follow) wrap.scrollTop = wrap.scrollHeight;
+}
+
+function resetRun(s, mode, model) {
+  entries = [];
+  $('log').replaceChildren(h('li', { class: 'empty' }, 'Waiting for the first message…'));
+  $('rounds').replaceChildren();
+  $('resultCard').hidden = true;
+  $('modeBadge').textContent = mode === 'live' ? `live: ${model}` : 'fake';
+  renderScenario(s);
+}
+
+/* ---------- result ---------- */
+const OUTCOME = { CONSENSUS: ['good', 'Consensus reached'], FALLBACK: ['warn', 'Fallback: our conservative default procedure'], ESCALATED: ['crit', 'Escalated: a human must decide'] };
+function showResult(ev) {
+  const [kind, title] = OUTCOME[ev.outcome] || ['warn', ev.outcome];
+  const card = $('resultCard');
+  card.replaceChildren(h('div', { class: 'result' }, ico(kind),
+    h('div', {}, h('div', { class: 'big' }, title), h('div', { class: 'what' }, ev.reason),
+      ev.proposal ? proposalChips(ev.proposal) : null,
+      h('p', { style: 'color:var(--ink2);margin:8px 0 0' },
+        ico(ev.log_valid ? 'good' : 'crit'), ` log hash chain ${ev.log_valid ? 'valid' : 'BROKEN'}, ${ev.entries} entries, head ${String(ev.head_hash || '').slice(0, 12)}…`,
+        ev.llm_usage ? ` · ${ev.llm_usage.calls} model calls, ${ev.llm_usage.input_tokens} in / ${ev.llm_usage.output_tokens} out tokens` : ''))));
+  card.hidden = false;
+}
+function showError(message) {
+  const card = $('resultCard');
+  card.replaceChildren(h('div', { class: 'result' }, ico('crit'), h('div', {}, h('div', { class: 'big' }, 'Run failed'), h('div', { class: 'what' }, message))));
+  card.hidden = false;
+}
+
+/* ---------- websocket ---------- */
+let attempts = 0;
+function setConn(kind, text) { $('conn').replaceChildren(ico(kind), h('span', {}, text)); }
+function setRunning(on) { running = on; $('run').disabled = on; $('run').textContent = on ? 'Running…' : 'Run negotiation'; }
+
+function connect() {
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  ws.onopen = () => { attempts = 0; setConn('good', 'live feed connected'); };
+  ws.onclose = () => { setConn('crit', 'disconnected, retrying…'); setTimeout(connect, Math.min(5000, 800 * ++attempts)); };
+  ws.onmessage = (m) => {
+    const ev = JSON.parse(m.data);
+    if (ev.type === 'idle') { setRunning(false); resetRun(ev.scenario, 'fake'); }
+    else if (ev.type === 'run_started') { setRunning(true); resetRun(ev.scenario, ev.mode, ev.model); }
+    else if (ev.type === 'entry') addEntry(ev.entry);
+    else if (ev.type === 'run_finished') { setRunning(false); showResult(ev); }
+    else if (ev.type === 'run_error') { setRunning(false); showError(ev.message); }
+  };
+}
+
+/* ---------- controls ---------- */
+function syncControls() {
+  const csv = $('source').value === 'csv', fake = $('mode').value === 'fake';
+  for (const id of ['kind', 'month', 'day']) $(id).disabled = !csv;
+  $('personas').style.display = fake ? 'contents' : 'none';
+  $('pace').parentElement.style.display = fake ? '' : 'none';
+}
+
+async function init() {
+  state = await (await fetch('/api/state')).json();
+  $('liveOpt').disabled = !state.allow_live;
+  if (!state.allow_live) $('liveOpt').textContent = 'Live (disabled: server.allow_live = false)';
+  $('personas').replaceChildren(...state.roles.map((role) => h('label', {}, `${{ ATC: 'ATC', PILOT: 'Pilot', GROUND: 'Ground' }[role] || role} behaviour`,
+    h('select', { id: 'persona-' + role }, state.personas.map((p) => h('option', { value: p === 'reasonable' ? '' : p }, p))))));
+  for (const id of ['mode', 'source']) $(id).addEventListener('change', syncControls);
+  syncControls();
+}
+
+$('controls').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  if (running) return;
+  const live = $('mode').value === 'live';
+  if (live && !confirm(`Start a LIVE run? Real ${state.model} calls will spend API credit (a typical run is a few cents).`)) return;
+  const csv = $('source').value === 'csv';
+  const personas = {};
+  if (!live) for (const role of state.roles) { const v = $('persona-' + role).value; if (v) personas[role] = v; }
+  const body = { source: $('source').value, mode: $('mode').value, personas, step_delay_s: Number($('pace').value),
+    ...(csv ? { month: Number($('month').value), day: Number($('day').value), kind: $('kind').value || null } : {}) };
+  $('msg').textContent = csv ? 'Building scenario…' : '';
+  $('run').disabled = true;
+  try {
+    const res = await fetch('/api/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); $('msg').textContent = typeof j.detail === 'string' ? j.detail : 'Request rejected.'; $('run').disabled = running; }
+    else $('msg').textContent = '';
+  } catch (e) { $('msg').textContent = 'Could not reach the server.'; $('run').disabled = running; }
+});
+
+$('theme').addEventListener('click', () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+});
+
+init().then(connect);
+</script>
+</body>
+</html>

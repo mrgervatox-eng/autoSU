@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal
 
 from pydantic import Field
 
@@ -25,6 +26,7 @@ Event = Literal[
     "ESCALATE",
 ]
 GENESIS = "0" * 64
+logger = logging.getLogger(__name__)
 
 
 class LogEntry(Strict):
@@ -48,6 +50,11 @@ class LogEntry(Strict):
 class ConsensusLog:
     def __init__(self, entries: list[LogEntry] | None = None) -> None:
         self.entries: list[LogEntry] = entries or []
+        self._subscribers: list[Callable[[LogEntry], None]] = []
+
+    def subscribe(self, callback: Callable[[LogEntry], None]) -> None:
+        """Call `callback(entry)` after every add(), on the thread that added it (used by the dashboard)."""
+        self._subscribers.append(callback)
 
     def add(self, round: int, event: Event, actor: str = "SYSTEM", message: Message | None = None,
             ok: bool | None = None, vetoed: bool = False, reasons: list[str] | None = None, note: str = "") -> LogEntry:
@@ -58,6 +65,11 @@ class ConsensusLog:
         )
         entry.hash = entry.compute_hash()
         self.entries.append(entry)
+        for callback in list(self._subscribers):
+            try:
+                callback(entry)
+            except Exception:  # noqa: BLE001 - a broken viewer must never break the negotiation
+                logger.exception("consensus log subscriber failed")
         return entry
 
     def verify(self) -> bool:

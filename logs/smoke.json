@@ -1,0 +1,253 @@
+[
+  {
+    "seq": 1,
+    "round": 1,
+    "event": "PROPOSAL",
+    "actor": "ATC",
+    "message": {
+      "sender": "ATC",
+      "round": 1,
+      "type": "PROPOSE",
+      "proposal": {
+        "delay_min": 131,
+        "hold_minutes": 10,
+        "separation_sec": 120,
+        "holding_area": "NORTH",
+        "gate": "A1",
+        "runway": "27L"
+      },
+      "proposal_id": null,
+      "constraint_check": [
+        {
+          "name": "min_separation_sec",
+          "passed": true,
+          "actual": 120,
+          "limit": 120,
+          "detail": ""
+        },
+        {
+          "name": "max_hold_min",
+          "passed": true,
+          "actual": 10,
+          "limit": 30,
+          "detail": ""
+        },
+        {
+          "name": "fuel_reserve_kg",
+          "passed": true,
+          "actual": 7527.0,
+          "limit": 6615.0,
+          "detail": "fuel after hold must cover trip fuel + reserve"
+        },
+        {
+          "name": "crew_duty_min",
+          "passed": true,
+          "actual": 692,
+          "limit": 780,
+          "detail": ""
+        },
+        {
+          "name": "gate_available",
+          "passed": true,
+          "actual": "A1",
+          "limit": "A1,A3,A5,B6",
+          "detail": ""
+        },
+        {
+          "name": "turbulence_at_holding_area",
+          "passed": true,
+          "actual": 0.27,
+          "limit": 0.6,
+          "detail": ""
+        },
+        {
+          "name": "runway_standing_water",
+          "passed": true,
+          "actual": 1.9,
+          "limit": 3.0,
+          "detail": ""
+        }
+      ],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.8,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "Absorb the 131 min weather delay on the ground, with a short 10 min hold in the calmer NORTH area (index 0.27). Use the driest runway 27L (1.9 mm), available gate A1 and minimum separation of 120 s.",
+      "ts": "2026-10-31T04:54:32.148044Z"
+    },
+    "ok": true,
+    "vetoed": false,
+    "reasons": [],
+    "note": "",
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "hash": "41b993099d681f854ee93651b90370e29774cd813c798423bbf60fcebe109380"
+  },
+  {
+    "seq": 2,
+    "round": 1,
+    "event": "RESPONSE",
+    "actor": "GROUND",
+    "message": {
+      "sender": "GROUND",
+      "round": 1,
+      "type": "ACCEPT",
+      "proposal": null,
+      "proposal_id": "1f98f170",
+      "constraint_check": [
+        {
+          "name": "min_separation_sec",
+          "passed": true,
+          "actual": 120,
+          "limit": 120,
+          "detail": ""
+        },
+        {
+          "name": "max_hold_min",
+          "passed": true,
+          "actual": 10,
+          "limit": 30,
+          "detail": ""
+        },
+        {
+          "name": "fuel_reserve_kg",
+          "passed": true,
+          "actual": 7527.0,
+          "limit": 6615.0,
+          "detail": "fuel after hold must cover trip fuel + reserve"
+        },
+        {
+          "name": "crew_duty_min",
+          "passed": true,
+          "actual": 692,
+          "limit": 780,
+          "detail": ""
+        },
+        {
+          "name": "gate_available",
+          "passed": true,
+          "actual": "A1",
+          "limit": "A1,A3,A5,B6",
+          "detail": ""
+        },
+        {
+          "name": "turbulence_at_holding_area",
+          "passed": true,
+          "actual": 0.27,
+          "limit": 0.6,
+          "detail": ""
+        },
+        {
+          "name": "runway_standing_water",
+          "passed": true,
+          "actual": 1.9,
+          "limit": 3.0,
+          "detail": ""
+        }
+      ],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.88,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "Runway 27L reads 1.9 mm standing water at 0.9 confidence, well under the 3.0 mm max. Gate A1 is in the available list.",
+      "ts": "2026-10-31T04:54:35.497339Z"
+    },
+    "ok": true,
+    "vetoed": false,
+    "reasons": [],
+    "note": "",
+    "prev_hash": "41b993099d681f854ee93651b90370e29774cd813c798423bbf60fcebe109380",
+    "hash": "0ab7ccd219b3bdb8d90a8ad7669a4dac97eafeb34016fa6a1f94649d34bc8945"
+  },
+  {
+    "seq": 3,
+    "round": 1,
+    "event": "RESPONSE",
+    "actor": "PILOT",
+    "message": {
+      "sender": "PILOT",
+      "round": 1,
+      "type": "ACCEPT",
+      "proposal": null,
+      "proposal_id": "1f98f170",
+      "constraint_check": [
+        {
+          "name": "min_separation_sec",
+          "passed": true,
+          "actual": 120,
+          "limit": 120,
+          "detail": ""
+        },
+        {
+          "name": "max_hold_min",
+          "passed": true,
+          "actual": 10,
+          "limit": 30,
+          "detail": ""
+        },
+        {
+          "name": "fuel_reserve_kg",
+          "passed": true,
+          "actual": 7527.0,
+          "limit": 6615.0,
+          "detail": "fuel after hold must cover trip fuel + reserve"
+        },
+        {
+          "name": "crew_duty_min",
+          "passed": true,
+          "actual": 692,
+          "limit": 780,
+          "detail": ""
+        },
+        {
+          "name": "gate_available",
+          "passed": true,
+          "actual": "A1",
+          "limit": "A1,A3,A5,B6",
+          "detail": ""
+        },
+        {
+          "name": "turbulence_at_holding_area",
+          "passed": true,
+          "actual": 0.27,
+          "limit": 0.6,
+          "detail": ""
+        },
+        {
+          "name": "runway_standing_water",
+          "passed": true,
+          "actual": 1.9,
+          "limit": 3.0,
+          "detail": ""
+        }
+      ],
+      "provenance": {
+        "source": "llm",
+        "confidence": 0.93,
+        "note": "claude-opus-5-5"
+      },
+      "rationale": "After the 10-minute hold, fuel is 7527 kg, which is 912 kg above the 6615 kg trip-plus-reserve minimum. Crew duty comes to 692 of 780 minutes, and NORTH turbulence is 0.27 at 0.9 confidence, well under the 0.6 limit.",
+      "ts": "2026-10-31T04:54:38.985668Z"
+    },
+    "ok": true,
+    "vetoed": false,
+    "reasons": [],
+    "note": "",
+    "prev_hash": "0ab7ccd219b3bdb8d90a8ad7669a4dac97eafeb34016fa6a1f94649d34bc8945",
+    "hash": "69b53803390585a006a49859744238112a5cdbca7b1357396225c302d5419639"
+  },
+  {
+    "seq": 4,
+    "round": 1,
+    "event": "CONSENSUS",
+    "actor": "SYSTEM",
+    "message": null,
+    "ok": null,
+    "vetoed": false,
+    "reasons": [],
+    "note": "ATC proposed, GROUND and PILOT accepted, validator confirmed (1f98f170)",
+    "prev_hash": "69b53803390585a006a49859744238112a5cdbca7b1357396225c302d5419639",
+    "hash": "52c7a90246d42326d4df5a7998a33508320b5e0530178e5c4ea8931bf2973692"
+  }
+]

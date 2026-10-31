@@ -94,12 +94,21 @@ def test_hard_constraint_enforced(ctx, good):
     assert check_proposal(ok, ctx).passed
 
 
-def test_hard_numeric_constraint_fails_closed_on_none(ctx, good):
-    ctx.hard_constraints = [HardConstraint(field="runway", op="<=", value=5)]
-    assert not check_proposal(good, ctx).passed  # runway is a str; but also None case below
+def test_hard_numeric_bound_fails_closed_on_non_numeric_field(ctx, good):
+    ctx.hard_constraints = [HardConstraint(field="runway", op="<=", value=5)]  # runway is "27L", not a number
+    assert "hard:runway<=5" in failed(check_proposal(good, ctx))
+
+
+def test_hard_numeric_bound_fails_closed_on_missing_value(ctx, good):
+    ctx.hard_constraints = [HardConstraint(field="gate", op="<=", value=5)]
     p = good.model_copy(update={"gate": None})
+    assert "hard:gate<=5" in failed(check_proposal(p, ctx))
+
+
+def test_hard_numeric_bound_on_real_number(ctx, good):
     ctx.hard_constraints = [HardConstraint(field="delay_min", op="<=", value=10)]
-    assert "hard:delay_min<=10" in failed(check_proposal(p, ctx))
+    assert "hard:delay_min<=10" in failed(check_proposal(good, ctx))  # good.delay_min == 20
+    assert check_proposal(good.model_copy(update={"delay_min": 10}), ctx).passed
 
 
 def test_hard_constraint_shape_validated():

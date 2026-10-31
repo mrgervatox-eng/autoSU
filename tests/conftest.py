@@ -4,6 +4,14 @@ from negotiator.constraints import AircraftState, ConstraintContext, RunwayObser
 from negotiator.schemas import Message, MessageType, Proposal, Provenance, Role, Source
 
 
+@pytest.fixture(autouse=True)
+def _tests_use_example_config(monkeypatch):
+    """Tests must never read the developer's config.toml (it can hold an API key or fake_mode = false)."""
+    from negotiator.config import ROOT
+
+    monkeypatch.setenv("NEGOTIATOR_CONFIG", str(ROOT / "config.example.toml"))
+
+
 def prov(conf=0.9, source=Source.SIMULATED):
     return Provenance(source=source, confidence=conf)
 
