@@ -20,6 +20,7 @@ from .config import ROOT, load_config
 from .engine import Negotiation
 from .fake_llm import PERSONAS, FakeLLM
 from .scenario import FIXTURE_CSV, build_scenario, load_scenario, render_cascade
+from .summary import render_with_rounds
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -69,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     print(render_cascade(scenario))
     print(f"\n--- negotiation ({mode}) ---")
     result = Negotiation(scenario, llm).run()
-    print(result.log.render())
+    print(render_with_rounds(result.log))
     p = result.proposal
     print(f"\nRESULT: {result.outcome.value} - {result.reason}")
     if p is not None:

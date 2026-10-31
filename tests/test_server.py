@@ -64,8 +64,15 @@ def test_index_page_is_self_contained_and_xss_safe(client):
     assert (STATIC / "index.html").read_text(encoding="utf-8") == html
 
 
-def test_page_marks_status_with_icon_and_label_not_colour_alone():
+def test_page_explains_rejections_and_the_inbound_flight():
     html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert "Why it was rejected" in html and "Why it was vetoed" in html and "Passed checks" in html  # failed first, passed second
+    assert "Inbound flight" in html and "absorb on the ground" in html
+    assert "ROUND_END" not in html  # round dividers are derived, never log entries
+
+
+def test_page_marks_status_with_icon_and_label_not_colour_alone():
+    html = (STATIC / "index.html").read_text(encoding="utf-8").lower()
     for label in ("rejected by validator", "vetoed by validator", "within limit", "over limit", "low confidence"):
         assert label in html
 

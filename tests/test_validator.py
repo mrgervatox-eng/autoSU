@@ -181,6 +181,39 @@ def test_accept_after_round_limit_is_vetoed(ctx, good):
     assert v.vetoed
 
 
+@pytest.mark.parametrize("mtype, kw", [(MessageType.PROPOSE, "proposal"), (MessageType.ACCEPT, "proposal_id")])
+def test_round_limit_is_exact(ctx, good, mtype, kw):
+    last = ctx.limits.max_rounds
+    arg = {kw: good if kw == "proposal" else good.proposal_id}
+    at_limit = review_message(make_msg(mtype, round_=last, **arg), ctx, current=good)
+    over = review_message(make_msg(mtype, round_=last + 1, **arg), ctx, current=good)
+    assert at_limit.ok and not at_limit.vetoed
+    assert not over.ok and over.vetoed == (mtype == MessageType.ACCEPT)
+    assert "max_rounds" in over.reasons[0]
+
+
+def test_reject_semantics(ctx, good):
+    fine = review_message(make_msg(MessageType.REJECT, proposal_id=good.proposal_id), ctx, current=good)
+    assert fine.ok and not fine.vetoed and not fine.reasons
+    stray = review_message(make_msg(MessageType.REJECT, proposal_id="deadbeef"), ctx, current=good)
+    assert not stray.ok and not stray.vetoed and "not on the table" in stray.reasons[0]
+    nothing = review_message(make_msg(MessageType.REJECT, proposal_id="deadbeef"), ctx, current=None)
+    assert nothing.ok and not nothing.vetoed  # rejecting when nothing is proposed is harmless
+
+
+def test_accept_with_nothing_on_table_is_refused_and_vetoed(ctx):
+    v = review_message(make_msg(MessageType.ACCEPT, proposal_id="deadbeef"), ctx, current=None)
+    assert not v.ok and v.vetoed and "no proposal on the table" in v.reasons[0]
+
+
+def test_vetoed_accept_explains_itself(ctx, good):
+    wrong = review_message(make_msg(MessageType.ACCEPT, proposal_id="deadbeef"), ctx, current=good)
+    assert not wrong.ok and wrong.vetoed and good.proposal_id in wrong.reasons[0]
+    unsafe = good.model_copy(update={"separation_sec": 10})
+    v = review_message(make_msg(MessageType.ACCEPT, proposal_id=unsafe.proposal_id), ctx, current=unsafe)
+    assert not v.ok and v.vetoed and "min_separation_sec" in v.reasons[0]
+
+
 def test_proposal_id_is_deterministic_and_content_sensitive(good):
     assert good.proposal_id == good.model_copy().proposal_id
     assert good.proposal_id != good.model_copy(update={"delay_min": 21}).proposal_id

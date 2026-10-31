@@ -5,12 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ATC disruption negotiator</title>
 <style>
-  /* Tokens: validated reference palette, categorical slots 1-3 for the three roles. Dark = its own steps. */
+  /* Tokens: validated reference palette. Categorical slots 1-3 identify the three roles; slots 6-7 (an adjacent,
+     validated pair that no role uses) draw the fuel and crew meters. Dark mode is its own set of steps. */
   :root {
     color-scheme: light;
     --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
     --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,.10);
-    --atc: #2a78d6; --pilot: #eb6834; --ground: #1baf7a; --bar: #2a78d6;
+    --atc: #2a78d6; --pilot: #eb6834; --ground: #1baf7a; --bar: #2a78d6; --seg-a: #6250d6; --seg-b: #008300;
     --good: #0ca30c; --warn: #fab219; --crit: #d03b3b; --wash: rgba(11,11,11,.04);
   }
   @media (prefers-color-scheme: dark) {
@@ -18,14 +19,14 @@
       color-scheme: dark;
       --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
       --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,.10);
-      --atc: #3987e5; --pilot: #d95926; --ground: #199e70; --bar: #3987e5; --wash: rgba(255,255,255,.05);
+      --atc: #3987e5; --pilot: #d95926; --ground: #199e70; --bar: #3987e5; --seg-a: #9085e9; --seg-b: #008300; --wash: rgba(255,255,255,.05);
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
     --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,.10);
-    --atc: #3987e5; --pilot: #d95926; --ground: #199e70; --bar: #3987e5; --wash: rgba(255,255,255,.05);
+    --atc: #3987e5; --pilot: #d95926; --ground: #199e70; --bar: #3987e5; --seg-a: #9085e9; --seg-b: #008300; --wash: rgba(255,255,255,.05);
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -37,18 +38,23 @@
   button:hover { background: var(--wash); }
   :focus-visible { outline: 2px solid var(--atc); outline-offset: 2px; }
   .pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; color: var(--ink2); background: var(--surface); }
-  .controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; padding: 0 20px 14px; }
+  .pill[hidden] { display: none; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; padding: 0 20px 6px; }
   .controls label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink2); }
   .controls input[type=number] { width: 64px; }
   .controls #run { background: var(--ink); color: var(--surface); border-color: var(--ink); font-weight: 600; padding: 7px 16px; }
   .controls #run:disabled { opacity: .5; cursor: progress; }
+  select:disabled, input:disabled { opacity: .5; }
   #msg { color: var(--ink); align-self: center; }
+  .hint { margin: 0 20px 14px; color: var(--ink2); font-size: 12.5px; min-height: 18px; }
   main { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; padding: 0 20px 28px; align-items: start; }
   @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
   .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
   .card h2 { font-size: 15px; margin: 0 0 8px; }
   .card h3 { font-size: 13px; margin: 14px 0 8px; color: var(--ink2); font-weight: 600; }
+  .card p { margin: 0 0 8px; }
+  .muted { color: var(--ink2); }
   .notice { background: var(--wash); border-radius: 8px; padding: 8px 10px; color: var(--ink2); font-size: 12.5px; }
   .badge { font-size: 10.5px; letter-spacing: .04em; border: 1px solid var(--axis); border-radius: 4px; padding: 0 5px; color: var(--ink2); text-transform: uppercase; white-space: nowrap; }
   /* cascade bars: thin, 4px rounded data end, anchored to the baseline */
@@ -61,13 +67,20 @@
   .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--bar); border-radius: 0 4px 4px 0; }
   .leg.seed { background: var(--wash); }
   .leg .tag { grid-column: 2 / -1; font-size: 12px; color: var(--ink2); margin-top: -2px; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 12px; }
   .tile { border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
-  .tile .k { font-size: 12px; color: var(--ink2); display: flex; justify-content: space-between; gap: 6px; }
+  .tile .lab { font-size: 12px; color: var(--ink2); }
   .tile .big { font-size: 22px; font-weight: 600; margin: 2px 0; }
   .tile .sub { font-size: 12px; color: var(--ink2); }
-  .meter { height: 6px; background: var(--grid); border-radius: 3px; margin-top: 6px; overflow: hidden; }
-  .meter > span { display: block; height: 100%; background: var(--bar); border-radius: 3px; }
+  /* segmented meters: 2px gaps between segments, 4px rounded ends, every segment labelled in the legend below */
+  .seg { display: flex; gap: 2px; height: 10px; margin-top: 8px; }
+  .seg .s { display: block; height: 100%; min-width: 2px; }
+  .seg .s:first-child { border-radius: 4px 0 0 4px; } .seg .s:last-child { border-radius: 0 4px 4px 0; }
+  .s.a, .k.a { background: var(--seg-a); } .s.b, .k.b { background: var(--seg-b); }
+  .s.free, .k.free { background: transparent; border: 1px solid var(--axis); }
+  .seglegend { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--ink2); }
+  .seglegend li { padding: 1px 0; }
+  .k { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th { text-align: left; color: var(--ink2); font-weight: 500; font-size: 12px; }
   th, td { padding: 5px 6px; border-bottom: 1px solid var(--grid); }
@@ -79,7 +92,7 @@
   .sw.ATC { background: var(--atc); } .sw.PILOT { background: var(--pilot); } .sw.GROUND { background: var(--ground); } .sw.SYSTEM { background: var(--muted); }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
   .chip { border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; font-size: 12.5px; color: var(--ink2); }
-  #logwrap { max-height: 70vh; overflow-y: auto; padding-right: 4px; }  /* the log scrolls inside the card; the page never jumps */
+  #logwrap { max-height: 70vh; overflow-y: auto; padding-right: 4px; }  /* the log scrolls inside its card; the page never jumps */
   ol#log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
   .entry { border: 1px solid var(--border); border-left-width: 4px; border-radius: 8px; padding: 8px 10px; }
   .entry.ATC { border-left-color: var(--atc); } .entry.PILOT { border-left-color: var(--pilot); }
@@ -90,29 +103,39 @@
   .entry p { margin: 4px 0 0; color: var(--ink2); }
   .kv { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   .kv span { background: var(--wash); border-radius: 4px; padding: 1px 7px; font-size: 12.5px; }
-  select:disabled, input:disabled { opacity: .5; }
   .entry ul { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; }
   .entry details { margin-top: 6px; font-size: 12.5px; color: var(--ink2); }
+  .entry details.why { color: var(--ink); }
+  .entry details summary { cursor: pointer; }
+  .entry details.why summary { font-weight: 600; }
+  .entry ul.checks { list-style: none; padding-left: 0; margin: 4px 0 0; }
+  .entry ul.checks li { padding: 2px 0; }
   .entry.veto { background: var(--wash); }
-  .divider { text-align: center; color: var(--muted); font-size: 12px; border-top: 1px dashed var(--axis); padding-top: 4px; margin-top: 2px; }
+  .divider { color: var(--ink2); font-size: 12.5px; border-top: 1px dashed var(--axis); padding-top: 6px; margin-top: 2px; }
   .result { display: flex; gap: 10px; align-items: flex-start; }
   .result .big { font-size: 20px; font-weight: 650; }
+  .result ul { margin: 4px 0 0; padding-left: 0; list-style: none; font-size: 12.5px; color: var(--ink2); }
+  .result li { padding: 2px 0; }
+  .audit { margin-top: 10px; color: var(--ink2); font-size: 12.5px; }
+  .audit details { margin-top: 4px; }
+  .audit a { color: var(--ink); }
   .empty { color: var(--muted); }
   #tip { position: fixed; z-index: 10; pointer-events: none; background: var(--ink); color: var(--surface); border-radius: 6px; padding: 6px 9px; font-size: 12.5px; max-width: 280px; white-space: pre-line; }
-  @media (forced-colors: active) { .fill, .meter > span { border: 1px solid CanvasText; } }
+  @media (forced-colors: active) { .fill, .seg .s { border: 1px solid CanvasText; } }
 </style>
 </head>
 <body>
 <header>
   <h1>ATC disruption negotiator <small id="scenarioId"></small></h1>
-  <span class="pill" id="conn"><span class="ico warn" aria-hidden="true">⚠</span><span>connecting…</span></span>
+  <span class="pill" id="liveBadge" hidden></span>
+  <span class="pill" id="conn" hidden></span>
   <button id="theme" type="button" aria-label="Toggle dark mode">Theme</button>
 </header>
 
 <form id="controls" class="controls" aria-label="Run settings">
   <label>Mode <select id="mode"><option value="fake">Fake (mock agents)</option><option value="live" id="liveOpt">Live (real Claude)</option></select></label>
   <label>Scenario <select id="source"><option value="file">Saved scenario</option><option value="csv">From flights data</option></select></label>
-  <label>Disruption <select id="kind"><option value="">Longest cascade</option><option value="weather">Weather</option><option value="late_aircraft">Late aircraft</option></select></label>
+  <label>Disruption <select id="kind"><option value="weather" selected>Weather delay</option><option value="late_aircraft">Late-arriving aircraft</option><option value="">Either type</option></select></label>
   <label>Month <input id="month" type="number" min="1" max="12" value="1"></label>
   <label>Day <input id="day" type="number" min="1" max="31" value="1"></label>
   <span id="personas" style="display:contents"></span>
@@ -120,19 +143,23 @@
   <button id="run" type="submit">Run negotiation</button>
   <span id="msg" role="alert"></span>
 </form>
+<p class="hint" id="kindHelp"></p>
 
 <main>
   <div class="col">
     <section class="card" aria-labelledby="h-cascade">
       <h2 id="h-cascade">Disruption and cascade</h2>
-      <p id="disruption" style="margin:0 0 8px"></p>
+      <p id="disruption"></p>
+      <p id="flightLine" class="muted"></p>
       <div class="notice" id="note"></div>
       <h3 id="chartTitle"></h3>
       <div id="bars" role="list"></div>
-      <p id="cascadeSummary" style="color:var(--ink2);margin:8px 0 0"></p>
+      <p id="cascadeSummary" class="muted" style="margin-top:8px"></p>
+      <p id="whyThis" class="muted"></p>
     </section>
     <section class="card" aria-labelledby="h-sim">
-      <h2 id="h-sim">Simulated conditions <span class="badge">simulated</span></h2>
+      <h2 id="h-sim">Simulated conditions<span id="simAt"></span> <span class="badge">simulated</span></h2>
+      <p id="simHint" class="muted"></p>
       <div class="tiles" id="tiles"></div>
       <table id="sensors"><thead><tr><th>Reading</th><th>Value</th><th>Limit</th><th>Status</th></tr></thead><tbody></tbody></table>
     </section>
@@ -141,7 +168,7 @@
     <section class="card" id="resultCard" hidden aria-live="polite"></section>
     <section class="card" aria-labelledby="h-neg">
       <h2 id="h-neg">Negotiation <span class="badge" id="modeBadge">fake</span></h2>
-      <div class="legend" aria-label="Legend: role colours"><span><i class="sw ATC"></i>ATC</span><span><i class="sw PILOT"></i>PILOT</span><span><i class="sw GROUND"></i>GROUND</span></div>
+      <div class="legend" aria-label="Legend: role colours"><span><i class="sw ATC"></i>ATC</span><span><i class="sw PILOT"></i>Pilot</span><span><i class="sw GROUND"></i>Ground</span></div>
       <div class="chips" id="rounds"></div>
       <div id="logwrap"><ol id="log" aria-live="polite"><li class="empty">No run yet. Press “Run negotiation”.</li></ol></div>
     </section>
@@ -169,10 +196,15 @@ function h(tag, props = {}, ...kids) {
 const ico = (kind) => h('span', { class: 'ico ' + kind, 'aria-hidden': 'true' }, { good: '✓', warn: '⚠', crit: '✕' }[kind]);
 const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + String(m % 60).padStart(2, '0');
 const signed = (n) => (n > 0 ? '+' : '') + n;
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+const fmt = (n) => Math.round(n).toLocaleString('en-US');
+const DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];  // 2015
 
-let state = { allow_live: false, personas: [], roles: [] };
+let state = { allow_live: false, personas: [], roles: [], model: '' };
 let entries = [];
+let roundInfo = {};
 let running = false;
+let runFinished = false;
 
 /* ---------- tooltip ---------- */
 const tip = $('tip');
@@ -184,13 +216,39 @@ function bindTip(el, text) {
   el.addEventListener('blur', () => { tip.hidden = true; });
 }
 
+/* ---------- segmented meter: every segment is labelled in the legend, so colour is never the only cue ---------- */
+function segMeter(total, segs, aria) {
+  const denom = Math.max(total, segs.reduce((a, s) => a + s.value, 0)) || 1;
+  return [
+    h('div', { class: 'seg', role: 'img', 'aria-label': aria },
+      segs.filter((s) => s.value > 0).map((s) => h('span', { class: 's ' + s.cls, style: `width:${(s.value / denom * 100).toFixed(2)}%` }))),
+    h('ul', { class: 'seglegend' }, segs.map((s) => h('li', {}, h('i', { class: 'k ' + s.cls }), `${s.label}: ${fmt(s.value)} ${s.unit}${s.extra || ''}`))),
+  ];
+}
+
 /* ---------- scenario panel ---------- */
+const KIND_NAME = { WEATHER: 'Weather delay', LATE_AIRCRAFT: 'Late-arriving aircraft' };
+const KIND_TEXT = {
+  WEATHER: 'Weather delay: this flight lost more than 15 minutes to weather.',
+  LATE_AIRCRAFT: 'Late-arriving aircraft: the plane arrived late from its previous flight and lost more than 20 minutes.',
+};
+const SIM_HINT = {
+  WEATHER: 'For a weather disruption the simulated destination has rough air in one holding area and a wet runway, so the agents have something to negotiate.',
+  LATE_AIRCRAFT: 'For a late-aircraft disruption the simulated destination is calm, so expect agreement quickly.',
+};
+
 function renderScenario(s) {
   const seed = s.chain[s.seed_index];
+  const c = s.cascade, a = s.context.aircraft, m = s.context.margins;
   $('scenarioId').textContent = s.scenario_id;
-  $('disruption').textContent = (s.disruption.kind === 'WEATHER' ? 'Weather' : 'Late-aircraft') + ' disruption: ' + s.disruption.description;
+  $('disruption').textContent = `${KIND_TEXT[s.disruption.kind]} ${s.disruption.description.replace('->', '→')}`;
+  $('flightLine').textContent = `Inbound flight ${seed.airline}${seed.flight_number}, ${seed.origin} → ${seed.destination}. The agents decide how much of the delay to absorb on the ground at ${seed.origin} and how long to hold in the air near ${seed.destination}. Runway, gate and holding-area conditions are at ${seed.destination}.`;
+  $('simAt').textContent = ` at ${seed.destination}`;
+  $('simHint').textContent = SIM_HINT[s.disruption.kind];
   $('note').textContent = s.enrichment_note;
   $('chartTitle').textContent = `Departure delay by leg, tail ${seed.tail_number}, ${seed.date} (minutes)`;
+  $('whyThis').textContent = `Chosen as the ${KIND_NAME[s.disruption.kind].toLowerCase()} flight with the most delayed flights after it on the same plane (${c.delayed_after_seed}).`;
+
   const max = Math.max(1, ...s.chain.map((l) => l.departure_delay_min || 0));
   const bars = $('bars');
   bars.replaceChildren();
@@ -209,100 +267,118 @@ function renderScenario(s) {
     bindTip(row, `${label}  ${l.origin}→${l.destination}\nscheduled ${hhmm(l.scheduled_departure_min)}\ndeparture delay ${d === null ? 'n/a' : signed(d)} min\narrival delay ${l.arrival_delay_min === null ? 'n/a' : signed(l.arrival_delay_min)} min\nweather ${l.weather_delay_min} min, late aircraft ${l.late_aircraft_delay_min} min`);
     bars.append(row);
   });
-  const c = s.cascade;
   $('cascadeSummary').textContent = `${c.legs_after_seed} later leg(s) on this tail, ${c.delayed_after_seed} delayed; ${c.total_late_aircraft_delay_after_seed_min} min of late-aircraft delay downstream.`;
 
-  const a = s.context.aircraft, m = s.context.margins;
-  const duty = a.crew_duty_used_min, flight = a.flight_time_remaining_min;
-  const tile = (k, big, sub, frac) => h('div', { class: 'tile' },
-    h('div', { class: 'k' }, h('span', {}, k)),
-    h('div', { class: 'big' }, big), h('div', { class: 'sub' }, sub),
-    frac === undefined ? null : h('div', { class: 'meter', role: 'img', 'aria-label': `${Math.round(frac * 100)}% of limit` }, h('span', { style: `width:${Math.min(100, frac * 100).toFixed(0)}%` })));
-  $('tiles').replaceChildren(
-    tile('Fuel on board', `${Math.round(a.fuel_on_board_kg)} kg`, `trip ${Math.round(a.trip_fuel_kg)} kg + reserve ${Math.round(m.fuel_reserve_kg)} kg`, (a.trip_fuel_kg + m.fuel_reserve_kg) / a.fuel_on_board_kg),
-    tile('Crew duty', `${duty + flight} / ${m.max_duty_min} min`, `${duty} used + ${flight} flight, before any delay`, (duty + flight) / m.max_duty_min),
-    tile('Gates free', a.available_gates.join(', ') || 'none', `${a.available_gates.length} available`));
+  // fuel: the bar is everything loaded at departure; what is not trip or reserve is what a hold can burn
+  const spare = Math.max(0, a.fuel_on_board_kg - a.trip_fuel_kg - m.fuel_reserve_kg);
+  const short = Math.max(0, a.trip_fuel_kg + m.fuel_reserve_kg - a.fuel_on_board_kg);
+  const holdMin = Math.floor(spare / a.hold_burn_kg_per_min);
+  const fuel = h('div', { class: 'tile' }, h('div', { class: 'lab' }, 'Fuel loaded at departure'), h('div', { class: 'big' }, `${fmt(a.fuel_on_board_kg)} kg`),
+    h('div', { class: 'sub' }, short ? `Short by ${fmt(short)} kg before any hold` : `Room for about ${holdMin} min of hold`),
+    ...segMeter(a.fuel_on_board_kg, [
+      { label: 'Trip fuel', value: a.trip_fuel_kg, unit: 'kg', cls: 'a' },
+      { label: 'Reserve', value: m.fuel_reserve_kg, unit: 'kg', cls: 'b' },
+      { label: 'Spare for a hold', value: spare, unit: 'kg', cls: 'free', extra: spare ? ` (about ${holdMin} min)` : '' }],
+      `Fuel: trip ${fmt(a.trip_fuel_kg)} kg, reserve ${fmt(m.fuel_reserve_kg)} kg, spare ${fmt(spare)} kg`));
+
+  // crew duty: the bar is the duty limit; what is left is the room for ground delay plus hold
+  const used = a.crew_duty_used_min, flight = a.flight_time_remaining_min;
+  const room = Math.max(0, m.max_duty_min - used - flight);
+  const crew = h('div', { class: 'tile' }, h('div', { class: 'lab' }, 'Crew duty'), h('div', { class: 'big' }, `${used + flight} of ${m.max_duty_min} min`),
+    h('div', { class: 'sub' }, room ? `Room for ${room} min of delay and hold` : 'No room left for delay or hold'),
+    ...segMeter(m.max_duty_min, [
+      { label: 'Used so far', value: used, unit: 'min', cls: 'a' },
+      { label: 'This flight', value: flight, unit: 'min', cls: 'b' },
+      { label: 'Room for delay and hold', value: room, unit: 'min', cls: 'free' }],
+      `Crew duty: used ${used} min, this flight ${flight} min, room ${room} min, limit ${m.max_duty_min} min`));
+
+  const gates = h('div', { class: 'tile' }, h('div', { class: 'lab' }, 'Gates free'), h('div', { class: 'big' }, a.available_gates.join(', ') || 'none'),
+    h('div', { class: 'sub' }, `${a.available_gates.length} available`));
+  $('tiles').replaceChildren(fuel, crew, gates);
 
   const rows = [];
   const status = (ok, conf) => {
     if (conf < m.min_observation_confidence) return [ico('warn'), ' low confidence, needs confirm'];
     return ok ? [ico('good'), ' within limit'] : [ico('crit'), ' over limit'];
   };
-  s.context.turbulence.forEach((o) => rows.push(h('tr', {}, h('td', {}, `Turbulence ${o.area}`), h('td', { class: 'num' }, o.index.toFixed(2)),
+  s.context.turbulence.forEach((o) => rows.push(h('tr', {}, h('td', {}, `Turbulence ${cap(o.area)}`), h('td', { class: 'num' }, o.index.toFixed(2)),
     h('td', { class: 'num' }, `≤ ${m.max_turbulence_index}`), h('td', {}, ...status(o.index <= m.max_turbulence_index, o.provenance.confidence)))));
   s.context.runways.forEach((o) => rows.push(h('tr', {}, h('td', {}, `Runway ${o.runway} standing water`), h('td', { class: 'num' }, `${o.standing_water_mm} mm`),
     h('td', { class: 'num' }, `≤ ${m.max_standing_water_mm} mm`), h('td', {}, ...status(o.standing_water_mm <= m.max_standing_water_mm, o.provenance.confidence)))));
   $('sensors').tBodies[0].replaceChildren(...rows);
 }
 
-/* ---------- negotiation log ---------- */
-const EVENT_LABEL = { PROPOSAL: 'PROPOSE', RESPONSE: null, VALIDATOR_VETO: 'VALIDATOR VETO', INVALID_OUTPUT: 'INVALID OUTPUT',
-  AGENT_ERROR: 'AGENT ERROR', CONSENSUS: 'CONSENSUS', FALLBACK: 'FALLBACK', ESCALATE: 'ESCALATE' };
+/* ---------- negotiation log (all wording comes from the server) ---------- */
+const KIND_ICON = { consensus: 'good', validator_rejected: 'crit', no_consensus: 'warn', no_proposal: 'warn' };
 
-function proposalChips(p) {
-  return h('div', { class: 'kv' },
-    h('span', {}, `delay ${p.delay_min} min`), h('span', {}, `hold ${p.hold_minutes} min${p.holding_area ? ' @ ' + p.holding_area : ''}`),
-    h('span', {}, `separation ${p.separation_sec} s`), h('span', {}, `gate ${p.gate ?? '–'}`), h('span', {}, `runway ${p.runway ?? '–'}`));
+function chips(list) { return h('div', { class: 'kv' }, list.map((t) => h('span', {}, t))); }
+
+function checkSections(checks, vetoed) {
+  const failed = checks.filter((c) => !c.passed), ok = checks.filter((c) => c.passed);
+  const list = (cs, kind) => h('ul', { class: 'checks' }, cs.map((c) => h('li', {}, ico(kind), ' ', c.text)));
+  return [
+    failed.length ? h('details', { class: 'why', open: true },
+      h('summary', {}, `${vetoed ? 'Why it was vetoed' : 'Why it was rejected'}: ${failed.length} check${failed.length > 1 ? 's' : ''} failed`), list(failed, 'crit')) : null,
+    ok.length ? h('details', {}, h('summary', {}, `Passed checks (${ok.length} of ${checks.length})`), list(ok, 'good')) : null,
+  ];
 }
 
-function entryNode(e) {
-  if (e.event === 'ROUND_END') return h('li', { class: 'divider' }, `Round ${e.round} ended${e.note ? ': ' + e.note : ''}`);
+function entryNode(e, v) {
   const m = e.message;
-  const label = EVENT_LABEL[e.event] ?? (m ? m.type : e.event);
   let verdict = null;
-  if (e.vetoed) verdict = h('span', { class: 'verdict' }, ico('warn'), ' vetoed by validator');
-  else if (e.ok === true) verdict = h('span', { class: 'verdict' }, ico('good'), ' validator: ok');
-  else if (e.ok === false) verdict = h('span', { class: 'verdict' }, ico('crit'), ' rejected by validator');
-  const checks = m && m.constraint_check && m.constraint_check.length ? m.constraint_check : null;
-  const passed = checks ? checks.filter((c) => c.passed).length : 0;
+  if (e.vetoed) verdict = h('span', { class: 'verdict' }, ico('warn'), ' Vetoed by validator');
+  else if (e.ok === true) verdict = h('span', { class: 'verdict' }, ico('good'), ' Validator: ok');
+  else if (e.ok === false) verdict = h('span', { class: 'verdict' }, ico('crit'), ' Rejected by validator');
+  const hasFailures = v.checks.some((c) => !c.passed);
   return h('li', { class: `entry ${e.actor}${e.vetoed ? ' veto' : ''}` },
     h('div', { class: 'head' },
       h('span', { class: 'what' }, `#${e.seq}`), h('span', { class: 'chip' }, `R${e.round}`),
-      h('span', { class: 'who' }, h('i', { class: `sw ${e.actor}` }), e.actor),
-      h('span', { class: 'what' }, label), verdict),
+      h('span', { class: 'who' }, h('i', { class: `sw ${e.actor}` }), v.actor_label),
+      h('span', { class: 'what' }, v.label), verdict),
     m && m.rationale ? h('p', {}, m.rationale) : null,
-    m && m.proposal ? proposalChips(m.proposal) : null,
-    m && !m.proposal && m.proposal_id ? h('div', { class: 'kv' }, h('span', {}, `proposal ${m.proposal_id}`)) : null,
-    e.reasons.length ? h('ul', {}, e.reasons.map((r) => h('li', {}, r))) : null,
+    v.chips.length ? chips(v.chips) : null,
+    m && !m.proposal && m.proposal_id ? chips([`Proposal ${m.proposal_id}`]) : null,
+    // the failed-check list says it better than the raw reason strings, so reasons only show when there is no check list
+    e.reasons.length && !hasFailures ? h('ul', {}, e.reasons.map((r) => h('li', {}, r))) : null,
     e.note ? h('p', {}, e.note) : null,
-    checks ? h('details', {}, h('summary', {}, `Validator checks: ${passed}/${checks.length} passed`),
-      h('ul', {}, checks.map((c) => h('li', {}, ico(c.passed ? 'good' : 'crit'), ` ${c.name}: ${c.actual ?? '–'} (limit ${c.limit ?? '–'})${c.detail ? ', ' + c.detail : ''}`)))) : null,
-    m ? h('div', { class: 'kv' }, h('span', {}, `source: ${m.provenance.source}, confidence ${Number(m.provenance.confidence).toFixed(2)}${m.provenance.note ? ' (' + m.provenance.note + ')' : ''}`)) : null);
+    v.checks.length ? checkSections(v.checks, e.vetoed) : null,
+    m ? chips([`Source: ${m.provenance.source}, confidence ${Number(m.provenance.confidence).toFixed(2)}${m.provenance.note ? ' (' + m.provenance.note + ')' : ''}`]) : null);
 }
 
-function renderRounds() {
-  const byRound = new Map();
-  for (const e of entries) {
-    const r = byRound.get(e.round) || { consensus: false, fallback: false, invalid: false, ended: false };
-    if (e.event === 'CONSENSUS') r.consensus = true;
-    if (e.event === 'FALLBACK' || e.event === 'ESCALATE') r.fallback = true;
-    if (e.event === 'PROPOSAL' && e.ok === false) r.invalid = true;
-    if (e.event === 'ROUND_END') r.ended = true;
-    byRound.set(e.round, r);
-  }
-  const chips = [...byRound].map(([n, r]) => {
-    let kind = 'warn', text = r.ended ? 'no consensus' : 'in progress';
-    if (r.consensus) { kind = 'good'; text = 'consensus'; }
-    else if (r.invalid && r.ended) { kind = 'crit'; text = 'proposal failed validation'; }
-    else if (r.fallback && !r.ended) { kind = 'warn'; text = 'fallback applied'; }
-    return h('span', { class: 'chip' }, ico(kind), ` Round ${n}: ${text}`);
-  });
-  $('rounds').replaceChildren(...chips);
-}
-
-function addEntry(e) {
+function appendToLog(node) {
   const wrap = $('logwrap');
   const follow = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 80;  // only follow if the reader is at the bottom
-  if (!entries.length) $('log').replaceChildren();
-  entries.push(e);
-  $('log').append(entryNode(e));
-  renderRounds();
+  if (!entries.length && !Object.keys(roundInfo).length) $('log').replaceChildren();
+  $('log').append(node);
   if (follow) wrap.scrollTop = wrap.scrollHeight;
 }
 
-function resetRun(s, mode, model) {
+function renderRounds() {
+  const rounds = [...new Set(entries.map((e) => e.round))].sort((a, b) => a - b);
+  $('rounds').replaceChildren(...rounds.map((n) => {
+    const s = roundInfo[n];
+    return s ? h('span', { class: 'chip' }, ico(KIND_ICON[s.kind] || 'warn'), ` Round ${n}: ${s.short}`)
+             : h('span', { class: 'chip' }, ico('warn'), ` Round ${n}: in progress`);
+  }));
+}
+
+function addEntry(e, v) {
+  appendToLog(entryNode(e, v));
+  entries.push(e);
+  renderRounds();
+}
+
+function addRoundSummary(s) {
+  roundInfo[s.round] = s;
+  appendToLog(h('li', { class: 'divider' }, ico(KIND_ICON[s.kind] || 'warn'), ' ', s.text));
+  renderRounds();
+}
+
+function resetRun(s, mode, model, message) {
+  runFinished = false;
   entries = [];
-  $('log').replaceChildren(h('li', { class: 'empty' }, 'Waiting for the first message…'));
+  roundInfo = {};
+  $('log').replaceChildren(h('li', { class: 'empty' }, message || 'Waiting for the first message…'));
   $('rounds').replaceChildren();
   $('resultCard').hidden = true;
   $('modeBadge').textContent = mode === 'live' ? `live: ${model}` : 'fake';
@@ -310,49 +386,101 @@ function resetRun(s, mode, model) {
 }
 
 /* ---------- result ---------- */
-const OUTCOME = { CONSENSUS: ['good', 'Consensus reached'], FALLBACK: ['warn', 'Fallback: our conservative default procedure'], ESCALATED: ['crit', 'Escalated: a human must decide'] };
+const OUTCOME = { CONSENSUS: ['good', 'Consensus reached', null], FALLBACK: ['warn', 'Fallback: our conservative default procedure', 'Why the fallback applied'],
+  ESCALATED: ['crit', 'Escalated: a human must decide', 'Why a human must decide'] };
+
 function showResult(ev) {
-  const [kind, title] = OUTCOME[ev.outcome] || ['warn', ev.outcome];
+  const [kind, title, whyTitle] = OUTCOME[ev.outcome] || ['warn', ev.outcome, null];
+  const head = ev.head_hash ? String(ev.head_hash).slice(0, 12) + '…' : '–';
+  const audit = h('div', { class: 'audit' },
+    ico(ev.log_valid ? 'good' : 'crit'),
+    ev.log_valid ? ` Audit log intact: ${ev.entries} entries, each linked to the one before it. Fingerprint ${head}`
+                 : ' Audit log BROKEN: an entry was changed or removed.',
+    ev.llm_usage ? ` · ${ev.llm_usage.calls} model calls, ${ev.llm_usage.input_tokens} in / ${ev.llm_usage.output_tokens} out tokens` : '',
+    h('details', {}, h('summary', {}, 'What is this?'),
+      h('p', {}, 'Every message and decision is saved in a log. Each entry stores a fingerprint (SHA-256) of itself and of the entry before it, so changing or deleting any entry breaks the chain and this check fails. The fingerprint identifies the whole log: keep a copy to show later that the log was not rewritten. It detects tampering; it does not say the agents were right.')),
+    h('a', { href: '/api/log' }, 'Download log (JSON)'));
   const card = $('resultCard');
   card.replaceChildren(h('div', { class: 'result' }, ico(kind),
-    h('div', {}, h('div', { class: 'big' }, title), h('div', { class: 'what' }, ev.reason),
-      ev.proposal ? proposalChips(ev.proposal) : null,
-      h('p', { style: 'color:var(--ink2);margin:8px 0 0' },
-        ico(ev.log_valid ? 'good' : 'crit'), ` log hash chain ${ev.log_valid ? 'valid' : 'BROKEN'}, ${ev.entries} entries, head ${String(ev.head_hash || '').slice(0, 12)}…`,
-        ev.llm_usage ? ` · ${ev.llm_usage.calls} model calls, ${ev.llm_usage.input_tokens} in / ${ev.llm_usage.output_tokens} out tokens` : ''))));
+    h('div', {}, h('div', { class: 'big' }, title), h('div', { class: 'muted' }, ev.reason),
+      ev.proposal_chips ? chips(ev.proposal_chips) : null,
+      whyTitle && ev.round_summaries.length ? h('details', { open: true }, h('summary', {}, whyTitle),
+        h('ul', {}, ev.round_summaries.map((s) => h('li', {}, ico(KIND_ICON[s.kind] || 'warn'), ' ', s.text)))) : null,
+      audit)));
   card.hidden = false;
 }
 function showError(message) {
   const card = $('resultCard');
-  card.replaceChildren(h('div', { class: 'result' }, ico('crit'), h('div', {}, h('div', { class: 'big' }, 'Run failed'), h('div', { class: 'what' }, message))));
+  card.replaceChildren(h('div', { class: 'result' }, ico('crit'), h('div', {}, h('div', { class: 'big' }, 'Run failed'), h('div', { class: 'muted' }, message))));
   card.hidden = false;
+}
+
+/* ---------- header badges ---------- */
+function updateLiveBadge(live) {
+  const b = $('liveBadge');
+  b.hidden = !live;
+  if (live) b.replaceChildren(ico('warn'), `Live: real Claude agents (${state.model})`);
 }
 
 /* ---------- websocket ---------- */
 let attempts = 0;
-function setConn(kind, text) { $('conn').replaceChildren(ico(kind), h('span', {}, text)); }
-function setRunning(on) { running = on; $('run').disabled = on; $('run').textContent = on ? 'Running…' : 'Run negotiation'; }
-
 function connect() {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
-  ws.onopen = () => { attempts = 0; setConn('good', 'live feed connected'); };
-  ws.onclose = () => { setConn('crit', 'disconnected, retrying…'); setTimeout(connect, Math.min(5000, 800 * ++attempts)); };
+  ws.onopen = () => { attempts = 0; $('conn').hidden = true; };  // nothing to show while everything is fine
+  ws.onclose = () => { $('conn').hidden = false; $('conn').replaceChildren(ico('crit'), 'Disconnected from the server, retrying…'); setTimeout(connect, Math.min(5000, 800 * ++attempts)); };
   ws.onmessage = (m) => {
     const ev = JSON.parse(m.data);
-    if (ev.type === 'idle') { setRunning(false); resetRun(ev.scenario, 'fake'); }
-    else if (ev.type === 'run_started') { setRunning(true); resetRun(ev.scenario, ev.mode, ev.model); }
-    else if (ev.type === 'entry') addEntry(ev.entry);
-    else if (ev.type === 'run_finished') { setRunning(false); showResult(ev); }
-    else if (ev.type === 'run_error') { setRunning(false); showError(ev.message); }
+    if (ev.type === 'idle') { setRunning(false); resetRun(ev.scenario, 'fake'); updateLiveBadge($('mode').value === 'live'); }
+    else if (ev.type === 'run_started') { setRunning(true); resetRun(ev.scenario, ev.mode, ev.model); updateLiveBadge(ev.mode === 'live'); }
+    else if (ev.type === 'entry') addEntry(ev.entry, ev.view);
+    else if (ev.type === 'round_summary') addRoundSummary(ev);
+    else if (ev.type === 'run_finished') { setRunning(false); runFinished = true; renderRounds(); showResult(ev); }
+    else if (ev.type === 'run_error') { setRunning(false); runFinished = true; renderRounds(); showError(ev.message); }
   };
 }
 
 /* ---------- controls ---------- */
+const KIND_HELP = {
+  weather: 'Weather delay: the flight lost more than 15 minutes to weather (WEATHER_DELAY above 15).',
+  late_aircraft: 'Late-arriving aircraft: the plane arrived late from its previous flight and lost more than 20 minutes (LATE_AIRCRAFT_DELAY above 20).',
+  '': 'Either type: whichever of the two gives the plane the most delayed flights afterwards. Often this is the late-aircraft case.',
+};
+
 function syncControls() {
   const csv = $('source').value === 'csv', fake = $('mode').value === 'fake';
-  for (const id of ['kind', 'month', 'day']) $(id).disabled = !csv;
+  for (const el of $('controls').querySelectorAll('select,input,button')) el.disabled = running;  // nothing changes mid-run
+  if (!running) for (const id of ['kind', 'month', 'day']) $(id).disabled = !csv;
+  $('day').max = DAYS[(Number($('month').value) || 1) - 1];
   $('personas').style.display = fake ? 'contents' : 'none';
   $('pace').parentElement.style.display = fake ? '' : 'none';
+  $('kindHelp').textContent = csv ? KIND_HELP[$('kind').value] : 'Using the saved scenario. Choose “From flights data” to pick a disruption type and a date.';
+}
+function setRunning(on) { running = on; $('run').textContent = on ? 'Running…' : 'Run negotiation'; syncControls(); }
+
+let previewSeq = 0, previewTimer = null;
+function schedulePreview() { clearTimeout(previewTimer); previewTimer = setTimeout(loadPreview, 350); }
+
+async function loadPreview() {
+  if (running) return;
+  const csv = $('source').value === 'csv';
+  const params = new URLSearchParams({ source: $('source').value });
+  if (csv) {
+    const month = Number($('month').value), day = Number($('day').value);
+    if (!(month >= 1 && month <= 12) || !(day >= 1 && day <= DAYS[month - 1])) { $('msg').textContent = 'That date does not exist in 2015.'; return; }
+    params.set('month', month); params.set('day', day);
+    if ($('kind').value) params.set('kind', $('kind').value);
+  }
+  const seq = ++previewSeq;  // a slower, older answer must never overwrite a newer one
+  $('msg').textContent = csv ? 'Loading scenario…' : '';
+  try {
+    const res = await fetch('/api/preview?' + params);
+    if (seq !== previewSeq) return;
+    if (!res.ok) { const j = await res.json().catch(() => ({})); $('msg').textContent = typeof j.detail === 'string' ? j.detail : 'Could not load that scenario.'; return; }
+    const s = await res.json();
+    if (seq !== previewSeq) return;
+    $('msg').textContent = '';
+    resetRun(s, $('mode').value, state.model, 'Press “Run negotiation” to negotiate this scenario.');
+  } catch (e) { if (seq === previewSeq) $('msg').textContent = 'Could not reach the server.'; }
 }
 
 async function init() {
@@ -360,8 +488,11 @@ async function init() {
   $('liveOpt').disabled = !state.allow_live;
   if (!state.allow_live) $('liveOpt').textContent = 'Live (disabled: server.allow_live = false)';
   $('personas').replaceChildren(...state.roles.map((role) => h('label', {}, `${{ ATC: 'ATC', PILOT: 'Pilot', GROUND: 'Ground' }[role] || role} behaviour`,
-    h('select', { id: 'persona-' + role }, state.personas.map((p) => h('option', { value: p === 'reasonable' ? '' : p }, p))))));
-  for (const id of ['mode', 'source']) $(id).addEventListener('change', syncControls);
+    h('select', { id: 'persona-' + role }, state.personas.map((p) => h('option', { value: p === 'reasonable' ? '' : p }, cap(p)))))));
+  $('mode').addEventListener('change', () => { syncControls(); updateLiveBadge($('mode').value === 'live'); });
+  for (const id of ['source', 'kind', 'month', 'day']) $(id).addEventListener('change', () => { syncControls(); schedulePreview(); });
+  $('day').addEventListener('input', schedulePreview);
+  $('month').addEventListener('input', schedulePreview);
   syncControls();
 }
 

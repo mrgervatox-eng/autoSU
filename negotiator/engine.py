@@ -64,8 +64,13 @@ def _areas(ctx: ConstraintContext) -> list[dict]:
 
 def build_view(role: Role, scenario: Scenario, round_: int, table: Proposal | None, own_last: Proposal | None,
                counters: list[dict], objections: list[dict], feedback: list[dict]) -> dict[str, Any]:
-    ctx, m = scenario.context, scenario.context.margins
-    base: dict[str, Any] = {"role": role.value, "round": round_, "max_rounds": ctx.limits.max_rounds}
+    ctx, m, seed = scenario.context, scenario.context.margins, scenario.seed
+    base: dict[str, Any] = {
+        "role": role.value, "round": round_, "max_rounds": ctx.limits.max_rounds,
+        # the flight is inbound: ground delay is absorbed at the origin, holds and runway/gate/separation are at the destination
+        "flight": {"flight": seed.label, "origin": seed.origin, "destination": seed.destination,
+                   "direction": f"inbound to {seed.destination}"},
+    }
     if role == Role.ATC:
         return base | {
             "disruption": scenario.disruption.description,
@@ -136,8 +141,7 @@ class Negotiation:
             # 1. ATC proposes
             msg = self._ask(Role.ATC, r, build_view(Role.ATC, self.scenario, r, None, own_last, counters, objections, feedback))
             counters, objections, feedback = [], [], []
-            if msg is None:
-                self.log.add(r, "ROUND_END", note="no usable ATC proposal")
+            if msg is None:  # already logged as INVALID_OUTPUT / AGENT_ERROR
                 continue
             verdict = review_message(msg, ctx)
             self.log.add(r, "PROPOSAL", "ATC", verdict.message, ok=verdict.ok, reasons=verdict.reasons)
@@ -146,7 +150,6 @@ class Negotiation:
             if not verdict.ok:
                 feedback = [{"name": v.name, "actual": v.actual, "limit": v.limit, "detail": v.detail}
                             for v in check_proposal(table, ctx).violations]
-                self.log.add(r, "ROUND_END", note="proposal failed validation")
                 continue
 
             # 2. responders
@@ -175,7 +178,6 @@ class Negotiation:
                     return NegotiationResult(Outcome.CONSENSUS, table, r, f"consensus in round {r}", self.log)
                 self.log.add(r, "VALIDATOR_VETO", ok=False, vetoed=True, reasons=[v.name for v in final.violations],
                              note="final check failed; consensus refused")
-            self.log.add(r, "ROUND_END", note="no consensus")
 
         return self._fallback(max_rounds)
 

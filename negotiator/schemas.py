@@ -47,14 +47,18 @@ class Provenance(Strict):
 
 
 class Proposal(Strict):
-    """A concrete resolution. Numeric fields are what the validator checks."""
+    """A concrete resolution for an INBOUND flight. Numeric fields are what the validator checks.
 
-    delay_min: int = Field(ge=0, le=1440, description="ground delay before departure/arrival slot")
-    hold_minutes: int = Field(ge=0, le=1440, description="airborne hold")
-    separation_sec: int = Field(ge=0, le=3600, description="planned separation to preceding aircraft")
-    holding_area: str | None = None
-    gate: str | None = None
-    runway: str | None = None
+    Ground delay is absorbed at the origin; the airborne hold, separation, gate and runway are all
+    at the destination airport.
+    """
+
+    delay_min: int = Field(ge=0, le=1440, description="minutes of ground delay absorbed at the origin before departure")
+    hold_minutes: int = Field(ge=0, le=1440, description="minutes of airborne hold near the destination")
+    separation_sec: int = Field(ge=0, le=3600, description="planned separation (seconds) to the preceding arrival at the destination")
+    holding_area: str | None = Field(default=None, description="holding area near the destination; required when hold_minutes > 0")
+    gate: str | None = Field(default=None, description="gate at the destination")
+    runway: str | None = Field(default=None, description="runway at the destination")
 
     @property
     def proposal_id(self) -> str:

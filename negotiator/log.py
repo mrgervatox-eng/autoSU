@@ -20,7 +20,7 @@ Event = Literal[
     "VALIDATOR_VETO",  # an ACCEPT the validator overruled
     "INVALID_OUTPUT",  # unparseable or protocol-violating agent output
     "AGENT_ERROR",     # the agent call itself failed
-    "ROUND_END",
+    "ROUND_END",       # legacy: no longer written (round boundaries are derived from entries); kept so old logs still load
     "CONSENSUS",
     "FALLBACK",
     "ESCALATE",
@@ -95,27 +95,28 @@ class ConsensusLog:
     def load(cls, path: str | Path) -> "ConsensusLog":
         return cls([LogEntry.model_validate(d) for d in json.loads(Path(path).read_text(encoding="utf-8"))])
 
+    @staticmethod
+    def render_entry(e: LogEntry) -> list[str]:
+        what = ""
+        if e.message is not None:
+            m = e.message
+            what = m.type.value
+            if m.proposal is not None:
+                p = m.proposal
+                what += (f" delay={p.delay_min} hold={p.hold_minutes}@{p.holding_area} sep={p.separation_sec} "
+                         f"gate={p.gate} rwy={p.runway}")
+            else:
+                what += f" id={m.proposal_id}"
+        verdict = "" if e.ok is None else ("  [ok]" if e.ok else "  [REJECTED by validator]")
+        if e.vetoed:
+            verdict = "  [VETOED]"
+        lines = [f"#{e.seq:02d} r{e.round} {e.event:<14} {e.actor:<7} {what}{verdict}"]
+        if e.message is not None and e.message.rationale:
+            lines.append(f"      why: {e.message.rationale}")
+        lines += [f"      - {r}" for r in e.reasons]
+        if e.note:
+            lines.append(f"      note: {e.note}")
+        return lines
+
     def render(self) -> str:
-        lines = []
-        for e in self.entries:
-            what = ""
-            if e.message is not None:
-                m = e.message
-                what = m.type.value
-                if m.proposal is not None:
-                    p = m.proposal
-                    what += (f" delay={p.delay_min} hold={p.hold_minutes}@{p.holding_area} sep={p.separation_sec} "
-                             f"gate={p.gate} rwy={p.runway}")
-                else:
-                    what += f" id={m.proposal_id}"
-            verdict = "" if e.ok is None else ("  [ok]" if e.ok else "  [REJECTED by validator]")
-            if e.vetoed:
-                verdict = "  [VETOED]"
-            lines.append(f"#{e.seq:02d} r{e.round} {e.event:<14} {e.actor:<7} {what}{verdict}")
-            if e.message is not None and e.message.rationale:
-                lines.append(f"      why: {e.message.rationale}")
-            for r in e.reasons:
-                lines.append(f"      - {r}")
-            if e.note:
-                lines.append(f"      note: {e.note}")
-        return "\n".join(lines)
+        return "\n".join(line for e in self.entries for line in self.render_entry(e))

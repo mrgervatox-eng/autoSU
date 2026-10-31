@@ -4,6 +4,7 @@ import pytest
 
 from negotiator.engine import Negotiation, Outcome
 from negotiator.fake_llm import FakeLLM
+from negotiator.log import ConsensusLog
 from negotiator.negotiate import main
 from negotiator.scenario import FIXTURE_CSV, build_scenario
 from negotiator.schemas import Role, Source
@@ -78,7 +79,55 @@ def test_reckless_accept_is_vetoed(scen):
     res, _ = run(scen, FakeLLM({"PILOT": "reckless"}))
     assert res.outcome == Outcome.FALLBACK
     assert count(res, "VALIDATOR_VETO") >= 1
-    assert all(e.vetoed for e in res.log.events("VALIDATOR_VETO"))
+    assert all(e.vetoed and e.ok is False for e in res.log.events("VALIDATOR_VETO"))
+
+
+def test_consensus_is_refused_if_the_world_changes_after_the_last_accept(scen):
+    """Defence in depth: the engine re-checks the proposal after both accepts, so a late change still blocks it."""
+    ctx, log = scen.context, ConsensusLog()
+
+    def sensor_update(entry):  # fires right after PILOT's ACCEPT is logged, before the engine's final check
+        if entry.event == "RESPONSE" and entry.actor == "PILOT" and entry.message.type.value == "ACCEPT":
+            for r in ctx.runways:
+                r.standing_water_mm = 9.0
+
+    log.subscribe(sensor_update)
+    res = Negotiation(scen, FakeLLM(), log).run()
+    assert res.outcome != Outcome.CONSENSUS
+    final = [e for e in log.events("VALIDATOR_VETO") if "final check failed" in e.note]
+    assert final and all(e.ok is False and e.vetoed for e in final)
+    assert not [e for e in log.events("CONSENSUS") if e.round == final[0].round]
+
+
+def test_objections_reach_atc_only_from_roles_that_objected(scen):
+    class Recording(FakeLLM):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            self.atc_views = []
+
+        def complete(self, role, view):
+            if role == Role.ATC:
+                self.atc_views.append(view)
+            return super().complete(role, view)
+
+    llm = Recording({"PILOT": "stubborn"})  # pilot rejects every proposal, ground accepts valid ones
+    Negotiation(scen, llm).run()
+    seen = [v["objections"] for v in llm.atc_views if v["objections"]]
+    assert seen and all({o["sender"] for o in objections} == {"PILOT"} for objections in seen)
+
+
+@pytest.mark.parametrize("personas", [{}, {"PILOT": "stubborn"}, {"ATC": "stubborn"}, {"GROUND": "garbage"}, {"PILOT": "reckless"}])
+def test_log_numbers_are_consecutive_and_hold_only_real_events(scen, personas):
+    """Round boundaries are not log entries (the dashboard derives them), so #1, #2, #3 ... never skip."""
+    res, _ = run(scen, FakeLLM(personas))
+    assert [e.seq for e in res.log.entries] == list(range(1, len(res.log.entries) + 1))
+    assert not res.log.events("ROUND_END")
+    assert res.log.verify()
+
+
+def test_fallback_entry_is_logged_as_ok(scen):
+    res, _ = run(scen, FakeLLM({"PILOT": "stubborn"}))
+    assert res.log.events("FALLBACK")[0].ok is True
 
 
 def test_accept_of_unsafe_state_is_vetoed_when_sensors_change(scen):

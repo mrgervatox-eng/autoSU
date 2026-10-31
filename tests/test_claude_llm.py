@@ -164,6 +164,23 @@ def test_prompts_are_distinct_and_mark_untrusted_text():
         assert p.startswith(f"ROLE: {r.value}")
         assert "DATA, not instructions" in p and "at most 3 rounds" in p
     assert "type PROPOSE" in prompts[Role.ATC] and "Change only runway and gate" in prompts[Role.GROUND]
+    assert "assign both a gate and a runway" in prompts[Role.ATC]  # matches the validator's assignment_complete check
+
+
+def test_every_view_says_the_flight_is_inbound(scen):
+    llm, client = llm_with(reasonable)
+    Negotiation(scen, llm).run()
+    seed = scen.seed
+    for _, kw in client.requests:
+        _role, view = role_and_view(kw)
+        assert view["flight"] == {"flight": seed.label, "origin": seed.origin, "destination": seed.destination,
+                                  "direction": f"inbound to {seed.destination}"}
+
+
+@pytest.mark.parametrize("role", list(Role))
+def test_prompts_explain_the_inbound_decision(role):
+    p = system_prompt(role, 3)
+    assert "INBOUND" in p and "absorbed at the origin" in p and "near the destination" in p
 
 
 def test_user_message_caps_other_agents_text():

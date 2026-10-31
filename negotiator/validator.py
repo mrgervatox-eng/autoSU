@@ -40,6 +40,23 @@ def needs_human_confirm(obs: TurbulenceObservation | RunwayObservation, margins:
     return not observation_usable(obs, margins)
 
 
+def _check_readings(name: str, target: str, readings: list, value_of, limit: float, margins: Margins) -> ConstraintCheck:
+    """Fail closed, worst case over every reading of the target.
+
+    - no reading at all                      -> fail
+    - ANY reading over the limit             -> fail (even a low-confidence one: a doubtful bad reading blocks)
+    - no reading is usable (all unconfirmed) -> fail, needs a human confirm
+    """
+    if not readings:
+        return ConstraintCheck(name=name, passed=False, limit=limit, detail=f"no observation for {target} (fail closed)")
+    worst = max(value_of(o) for o in readings)
+    if worst > limit:
+        return ConstraintCheck(name=name, passed=False, actual=worst, limit=limit)
+    if not any(observation_usable(o, margins) for o in readings):
+        return ConstraintCheck(name=name, passed=False, actual=worst, limit=limit, detail="low-confidence observation, needs human confirm")
+    return ConstraintCheck(name=name, passed=True, actual=worst, limit=limit)
+
+
 def _check_turbulence(p: Proposal, ctx: ConstraintContext) -> ConstraintCheck:
     limit = ctx.margins.max_turbulence_index
     name = "turbulence_at_holding_area"
@@ -47,12 +64,8 @@ def _check_turbulence(p: Proposal, ctx: ConstraintContext) -> ConstraintCheck:
         return ConstraintCheck(name=name, passed=True, limit=limit, detail="no hold requested")
     if p.holding_area is None:
         return ConstraintCheck(name=name, passed=False, limit=limit, detail="holding_area required when hold_minutes > 0")
-    obs = next((o for o in ctx.turbulence if o.area == p.holding_area), None)
-    if obs is None:
-        return ConstraintCheck(name=name, passed=False, limit=limit, detail=f"no observation for area {p.holding_area} (fail closed)")
-    if not observation_usable(obs, ctx.margins):
-        return ConstraintCheck(name=name, passed=False, actual=obs.index, limit=limit, detail="low-confidence observation, needs human confirm")
-    return ConstraintCheck(name=name, passed=obs.index <= limit, actual=obs.index, limit=limit)
+    readings = [o for o in ctx.turbulence if o.area == p.holding_area]
+    return _check_readings(name, f"area {p.holding_area}", readings, lambda o: o.index, limit, ctx.margins)
 
 
 def _check_runway(p: Proposal, ctx: ConstraintContext) -> ConstraintCheck:
@@ -60,12 +73,18 @@ def _check_runway(p: Proposal, ctx: ConstraintContext) -> ConstraintCheck:
     name = "runway_standing_water"
     if p.runway is None:
         return ConstraintCheck(name=name, passed=True, limit=limit, detail="no runway requested")
-    obs = next((o for o in ctx.runways if o.runway == p.runway), None)
-    if obs is None:
-        return ConstraintCheck(name=name, passed=False, limit=limit, detail=f"no observation for runway {p.runway} (fail closed)")
-    if not observation_usable(obs, ctx.margins):
-        return ConstraintCheck(name=name, passed=False, actual=obs.standing_water_mm, limit=limit, detail="low-confidence observation, needs human confirm")
-    return ConstraintCheck(name=name, passed=obs.standing_water_mm <= limit, actual=obs.standing_water_mm, limit=limit)
+    readings = [o for o in ctx.runways if o.runway == p.runway]
+    return _check_readings(name, f"runway {p.runway}", readings, lambda o: o.standing_water_mm, limit, ctx.margins)
+
+
+def _check_assignment(p: Proposal, margins: Margins) -> ConstraintCheck:
+    """A plan that assigns no gate or runway is not a resolution, so it cannot reach consensus."""
+    name = "assignment_complete"
+    if not margins.require_gate_and_runway:
+        return ConstraintCheck(name=name, passed=True, detail="not required by policy")
+    missing = [f for f in ("gate", "runway") if getattr(p, f) is None]
+    return ConstraintCheck(name=name, passed=not missing, actual=("missing " + ", ".join(missing)) if missing else "gate and runway assigned",
+                           limit="gate and runway required")
 
 
 def check_proposal(p: Proposal, ctx: ConstraintContext) -> CheckReport:
@@ -86,6 +105,7 @@ def check_proposal(p: Proposal, ctx: ConstraintContext) -> CheckReport:
         ConstraintCheck(name="fuel_reserve_kg", passed=fuel_left >= fuel_needed, actual=round(fuel_left, 1), limit=round(fuel_needed, 1), detail="fuel after hold must cover trip fuel + reserve"),
         ConstraintCheck(name="crew_duty_min", passed=duty_total <= m.max_duty_min, actual=duty_total, limit=m.max_duty_min),
         gate,
+        _check_assignment(p, m),
         _check_turbulence(p, ctx),
         _check_runway(p, ctx),
     ]
