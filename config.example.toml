@@ -1,0 +1,21 @@
+# Copy to config.toml and edit. config.toml is gitignored so the API key stays local.
+
+[llm]
+model = "claude-sonnet-5-5"
+api_key = ""          # leave empty while fake_mode = true
+fake_mode = true      # true = mock LLM + simulated sensors (no network, no phones)
+
+[limits]
+max_rounds = 3
+max_human_rejections = 2
+decision_timeout_s = 60
+
+# SIMULATED safety margins for the hackathon scenario. Not real-world standards.
+[margins]
+min_separation_sec = 120
+fuel_reserve_kg = 1800.0
+max_hold_min = 30
+max_duty_min = 780
+max_turbulence_index = 0.6
+max_standing_water_mm = 3.0
+min_observation_confidence = 0.6
