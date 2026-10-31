@@ -18,8 +18,14 @@ class LLMConfig(Strict):
     fake_mode: bool = True
 
 
+class DataConfig(Strict):
+    flights_csv: str = "flights.csv"
+    scenario_path: str = "data/scenario.json"
+
+
 class AppConfig(Strict):
     llm: LLMConfig = Field(default_factory=LLMConfig)
+    data: DataConfig = Field(default_factory=DataConfig)
     limits: Limits = Field(default_factory=Limits)
     margins: Margins = Field(default_factory=Margins)
 

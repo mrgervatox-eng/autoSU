@@ -5,6 +5,10 @@ model = "claude-sonnet-5-5"
 api_key = ""          # leave empty while fake_mode = true
 fake_mode = true      # true = mock LLM + simulated sensors (no network, no phones)
 
+[data]
+flights_csv = "flights.csv"            # full 2015 DOT file (gitignored)
+scenario_path = "data/scenario.json"   # generated seed scenario (small, committed)
+
 [limits]
 max_rounds = 3
 max_human_rejections = 2

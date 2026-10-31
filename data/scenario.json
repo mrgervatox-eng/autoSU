@@ -1,0 +1,201 @@
+{
+  "scenario_id": "2015-01-01-N503JB-1434",
+  "provenance": {
+    "source": "dataset",
+    "confidence": 1.0,
+    "note": "2015 DOT flights CSV"
+  },
+  "enrichment_note": "Flight legs and delays come from the 2015 DOT flights data. Fuel, gates, crew hours and sensor readings are SIMULATED (scenario-enrichment layer).",
+  "seed_index": 0,
+  "chain": [
+    {
+      "date": "2015-01-01",
+      "airline": "B6",
+      "flight_number": "1434",
+      "tail_number": "N503JB",
+      "origin": "SJU",
+      "destination": "MCO",
+      "scheduled_departure_min": 365,
+      "scheduled_time_min": 188,
+      "air_time_min": 165,
+      "departure_delay_min": 93,
+      "arrival_delay_min": 88,
+      "weather_delay_min": 0,
+      "late_aircraft_delay_min": 88,
+      "cancelled": false,
+      "diverted": false
+    },
+    {
+      "date": "2015-01-01",
+      "airline": "B6",
+      "flight_number": "28",
+      "tail_number": "N503JB",
+      "origin": "MCO",
+      "destination": "EWR",
+      "scheduled_departure_min": 545,
+      "scheduled_time_min": 150,
+      "air_time_min": 125,
+      "departure_delay_min": 78,
+      "arrival_delay_min": 76,
+      "weather_delay_min": 0,
+      "late_aircraft_delay_min": 74,
+      "cancelled": false,
+      "diverted": false
+    },
+    {
+      "date": "2015-01-01",
+      "airline": "B6",
+      "flight_number": "127",
+      "tail_number": "N503JB",
+      "origin": "EWR",
+      "destination": "MCO",
+      "scheduled_departure_min": 750,
+      "scheduled_time_min": 172,
+      "air_time_min": 142,
+      "departure_delay_min": 74,
+      "arrival_delay_min": 73,
+      "weather_delay_min": 0,
+      "late_aircraft_delay_min": 60,
+      "cancelled": false,
+      "diverted": false
+    },
+    {
+      "date": "2015-01-01",
+      "airline": "B6",
+      "flight_number": "2224",
+      "tail_number": "N503JB",
+      "origin": "MCO",
+      "destination": "DCA",
+      "scheduled_departure_min": 969,
+      "scheduled_time_min": 127,
+      "air_time_min": 100,
+      "departure_delay_min": 64,
+      "arrival_delay_min": 61,
+      "weather_delay_min": 0,
+      "late_aircraft_delay_min": 61,
+      "cancelled": false,
+      "diverted": false
+    },
+    {
+      "date": "2015-01-01",
+      "airline": "B6",
+      "flight_number": "1579",
+      "tail_number": "N503JB",
+      "origin": "DCA",
+      "destination": "FLL",
+      "scheduled_departure_min": 1139,
+      "scheduled_time_min": 160,
+      "air_time_min": 125,
+      "departure_delay_min": 58,
+      "arrival_delay_min": 43,
+      "weather_delay_min": 0,
+      "late_aircraft_delay_min": 43,
+      "cancelled": false,
+      "diverted": false
+    },
+    {
+      "date": "2015-01-01",
+      "airline": "B6",
+      "flight_number": "1602",
+      "tail_number": "N503JB",
+      "origin": "FLL",
+      "destination": "JFK",
+      "scheduled_departure_min": 1345,
+      "scheduled_time_min": 157,
+      "air_time_min": 135,
+      "departure_delay_min": 42,
+      "arrival_delay_min": 42,
+      "weather_delay_min": 0,
+      "late_aircraft_delay_min": 37,
+      "cancelled": false,
+      "diverted": false
+    }
+  ],
+  "disruption": {
+    "kind": "LATE_AIRCRAFT",
+    "delay_min": 88,
+    "description": "B61434 SJU->MCO: 88 min late-aircraft delay"
+  },
+  "cascade": {
+    "legs_in_chain": 6,
+    "legs_after_seed": 5,
+    "delayed_after_seed": 5,
+    "total_late_aircraft_delay_after_seed_min": 275
+  },
+  "context": {
+    "margins": {
+      "min_separation_sec": 120,
+      "fuel_reserve_kg": 1800.0,
+      "max_hold_min": 30,
+      "max_duty_min": 780,
+      "max_turbulence_index": 0.6,
+      "max_standing_water_mm": 3.0,
+      "min_observation_confidence": 0.6
+    },
+    "limits": {
+      "max_rounds": 3,
+      "max_human_rejections": 2,
+      "decision_timeout_s": 60
+    },
+    "aircraft": {
+      "tail_number": "N503JB",
+      "fuel_on_board_kg": 9930.0,
+      "trip_fuel_kg": 7425.0,
+      "hold_burn_kg_per_min": 40.0,
+      "crew_duty_used_min": 368,
+      "flight_time_remaining_min": 188,
+      "available_gates": [
+        "A5",
+        "B6",
+        "B7",
+        "B8"
+      ],
+      "enrichment_label": "SIMULATED scenario-enrichment layer"
+    },
+    "turbulence": [
+      {
+        "area": "NORTH",
+        "index": 0.35,
+        "provenance": {
+          "source": "simulated",
+          "confidence": 0.9,
+          "note": "simulated sensor (fake mode)"
+        },
+        "human_confirmed": false
+      },
+      {
+        "area": "SOUTH",
+        "index": 0.33,
+        "provenance": {
+          "source": "simulated",
+          "confidence": 0.9,
+          "note": "simulated sensor (fake mode)"
+        },
+        "human_confirmed": false
+      }
+    ],
+    "runways": [
+      {
+        "runway": "27L",
+        "standing_water_mm": 1.6,
+        "provenance": {
+          "source": "simulated",
+          "confidence": 0.9,
+          "note": "simulated sensor (fake mode)"
+        },
+        "human_confirmed": false
+      },
+      {
+        "runway": "09R",
+        "standing_water_mm": 1.7,
+        "provenance": {
+          "source": "simulated",
+          "confidence": 0.9,
+          "note": "simulated sensor (fake mode)"
+        },
+        "human_confirmed": false
+      }
+    ],
+    "hard_constraints": []
+  }
+}
